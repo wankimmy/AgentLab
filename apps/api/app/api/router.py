@@ -8,6 +8,9 @@ from app.authentication.router import router as auth_router
 from app.conversations.router import router as conversations_router
 from app.core.db import get_db
 from app.guides.router import router as guides_router
+from app.knowledge.retrieval_router import router as retrieval_router
+from app.knowledge.retrieval_router import version_router as version_collections_router
+from app.knowledge.router import router as knowledge_router
 from app.messages.router import router as messages_router
 from app.models.entities import Agent, AgentVersion, OnboardingProgress, ReleaseStatus
 from app.models_api.router import router as models_router
@@ -29,6 +32,9 @@ api_router.include_router(conversations_router)
 api_router.include_router(messages_router)
 api_router.include_router(traces_router)
 api_router.include_router(models_router)
+api_router.include_router(knowledge_router)
+api_router.include_router(retrieval_router)
+api_router.include_router(version_collections_router)
 
 
 @api_router.get("/health")

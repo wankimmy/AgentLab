@@ -415,3 +415,106 @@ class MessageFeedback(Base, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text)
 
     message: Mapped["Message"] = relationship(back_populates="feedback")
+
+
+class ReadinessStatus(str, enum.Enum):
+    not_started = "not_started"
+    needs_preparation = "needs_preparation"
+    ready_for_testing = "ready_for_testing"
+    ready = "ready"
+
+
+class DocumentStatus(str, enum.Enum):
+    uploaded = "uploaded"
+    processing = "processing"
+    ready = "ready"
+    failed = "failed"
+    archived = "archived"
+
+
+class JobStatus(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class KnowledgeCollection(Base, TimestampMixin):
+    __tablename__ = "knowledge_collections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    purpose: Mapped[str] = mapped_column(Text, default="")
+    readiness_status: Mapped[ReadinessStatus] = mapped_column(
+        Enum(ReadinessStatus), default=ReadinessStatus.not_started
+    )
+    planning_metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    documents: Mapped[list["Document"]] = relationship(back_populates="collection")
+
+
+class Document(Base, TimestampMixin):
+    __tablename__ = "documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("knowledge_collections.id"), nullable=False
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), default="")
+    storage_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[DocumentStatus] = mapped_column(
+        Enum(DocumentStatus), default=DocumentStatus.uploaded
+    )
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0)
+    embedding_model: Mapped[str] = mapped_column(String(100), default="mock-embed")
+    chunking_settings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    extracted_text: Mapped[str] = mapped_column(Text, default="")
+    error_info: Mapped[dict | None] = mapped_column(JSONB)
+
+    collection: Mapped["KnowledgeCollection"] = relationship(back_populates="documents")
+    chunks: Mapped[list["DocumentChunk"]] = relationship(
+        back_populates="document", order_by="DocumentChunk.sort_order"
+    )
+
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, default=0)
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    heading: Mapped[str | None] = mapped_column(String(255))
+    chunk_metadata: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    document: Mapped["Document"] = relationship(back_populates="chunks")
+
+
+class AgentVersionCollection(Base):
+    __tablename__ = "agent_version_collections"
+
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), primary_key=True
+    )
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("knowledge_collections.id"), primary_key=True
+    )
+
+
+class BackgroundJob(Base, TimestampMixin):
+    __tablename__ = "background_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    job_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.pending)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    error: Mapped[str | None] = mapped_column(Text)

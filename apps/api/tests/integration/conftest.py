@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
@@ -23,8 +23,46 @@ TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=Fals
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.commit()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                """
+                ALTER TABLE document_chunks
+                ADD COLUMN IF NOT EXISTS embedding vector(1536)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                ALTER TABLE document_chunks
+                ADD COLUMN IF NOT EXISTS content_tsv tsvector
+                GENERATED ALWAYS AS (to_tsvector('english', coalesce(content, ''))) STORED
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_document_chunks_embedding
+                ON document_chunks USING hnsw (embedding vector_cosine_ops)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS ix_document_chunks_content_tsv
+                ON document_chunks USING gin (content_tsv)
+                """
+            )
+        )
+        conn.commit()
     with TestingSessionLocal() as db:
         seed_owner(db)
         seed_tools(db)

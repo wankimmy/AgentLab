@@ -133,16 +133,16 @@ npx playwright test tests/e2e/playground.spec.ts
 
 ### Deliverables
 
-- [ ] Knowledge collections CRUD + readiness checks
-- [ ] Document upload with validation
-- [ ] Celery tasks: extract, chunk, embed, store
-- [ ] pgvector search + keyword search + hybrid
-- [ ] Retrieval service integrated into runtime
-- [ ] Citation generation
-- [ ] Retrieval debugger UI
-- [ ] Knowledge guides (in-app content)
-- [ ] Document inspection UI (text, chunks, metadata)
-- [ ] Re-index manual actions with cost warning
+- [x] Knowledge collections CRUD + readiness checks
+- [x] Document upload with validation
+- [x] Celery tasks: extract, chunk, embed, store
+- [x] pgvector search + keyword search + hybrid
+- [x] Retrieval service integrated into runtime
+- [x] Citation generation
+- [x] Retrieval debugger UI
+- [x] Knowledge guides (in-app content)
+- [x] Document inspection UI (text, chunks, metadata)
+- [x] Re-index manual actions with cost warning
 
 ### Acceptance criteria
 

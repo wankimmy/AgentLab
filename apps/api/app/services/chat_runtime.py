@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.entities import (
     Agent,
     AgentVersion,
+    AgentVersionCollection,
     ChatTrace,
     Conversation,
     Message,
@@ -19,6 +20,7 @@ from app.models.entities import (
 from app.providers.base import ChatRequest
 from app.providers.registry import get_provider
 from app.services.cost_service import estimate_cost
+from app.services.retrieval_service import RetrievalService, build_rag_context_block
 
 SUMMARY_RECENT_MESSAGES = 20
 
@@ -119,6 +121,25 @@ async def stream_chat_turn(
     max_tokens = version.model_config_json.get("max_tokens", 1024)
 
     messages = assemble_messages(version, conversation, user_content, overrides)
+
+    retrieved_citations: list[dict] = []
+    if version.rag_enabled:
+        linked = (
+            db.query(AgentVersionCollection)
+            .filter(AgentVersionCollection.agent_version_id == version.id)
+            .count()
+        )
+        if linked > 0:
+            chunks = RetrievalService(db).retrieve(
+                user_content,
+                version_id=version.id,
+                config=version.retrieval_config,
+            )
+            retrieved_citations = [c.to_citation() for c in chunks]
+            rag_block = build_rag_context_block(chunks)
+            if rag_block:
+                messages.insert(1, {"role": "system", "content": rag_block})
+
     request = ChatRequest(
         model=model,
         messages=messages,
@@ -152,6 +173,7 @@ async def stream_chat_turn(
             }.items()
             if v is not None
         },
+        retrieved_chunks=retrieved_citations,
     )
     db.add(trace)
     db.flush()

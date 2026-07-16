@@ -12,6 +12,7 @@
           <NuxtLink to="/templates" class="hover:text-[var(--text)]">Templates</NuxtLink>
           <NuxtLink to="/learning" class="hover:text-[var(--text)]">Learning</NuxtLink>
           <NuxtLink to="/knowledge" class="hover:text-[var(--text)]">Knowledge</NuxtLink>
+          <NuxtLink to="/retrieval-debugger" class="hover:text-[var(--text)]">Retrieval</NuxtLink>
           <NuxtLink to="/evaluations" class="hover:text-[var(--text)]">Evaluations</NuxtLink>
           <button
             v-if="user"

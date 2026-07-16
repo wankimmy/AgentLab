@@ -39,6 +39,7 @@ services:
       - "8000:8000"
     volumes:
       - ./apps/api:/app
+      - uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,5 +62,25 @@ services:
     depends_on:
       - api
 
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://agentlab:agentlab@postgres:5432/agentlab
+      REDIS_URL: redis://redis:6379/0
+    command: celery -A app.workers.celery_app worker --loglevel=info
+    volumes:
+      - ./apps/api:/app
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  uploads:

@@ -23,6 +23,22 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_default_model: str = "gpt-4o-mini"
 
+    embedding_base_url: str = "https://api.openai.com"
+    embedding_api_key: str = ""
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
+    uploads_dir: str = "uploads"
+    celery_broker_url: str = ""
+    celery_result_backend: str = ""
+
+    @property
+    def broker_url(self) -> str:
+        return self.celery_broker_url or self.redis_url
+
+    @property
+    def result_backend(self) -> str:
+        return self.celery_result_backend or self.redis_url
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

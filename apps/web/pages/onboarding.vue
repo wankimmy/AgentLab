@@ -233,7 +233,7 @@ onMounted(async () => {
 
     <!-- Step 4: Knowledge -->
     <div v-else-if="step === 4" class="space-y-4 rounded-xl border border-[var(--border)] bg-white p-6">
-      <p class="text-[var(--muted)]">Knowledge upload arrives in Phase 4. Skip for now or plan to install sample data later.</p>
+      <p class="text-[var(--muted)]">Upload approved documents or skip and set up knowledge later.</p>
       <label class="flex items-center gap-2">
         <input v-model="knowledgeChoice" type="radio" value="skip" />
         Skip for now
