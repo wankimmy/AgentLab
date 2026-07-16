@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #0d6e6e;
+  --accent-hover: #0a5858;
+  --border: #e2e8f0;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: linear-gradient(160deg, #eef4ff 0%, #f8fafc 45%, #f1f5f9 100%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+code, pre, .mono {
+  font-family: 'IBM Plex Mono', monospace;
+}

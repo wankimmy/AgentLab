@@ -1,0 +1,7 @@
+{
+  "slug": "erp-support",
+  "name": "ERP Support Assistant",
+  "risk_level": "medium",
+  "setup_effort": "high",
+  "description": "Answer ERP questions from approved manuals with citations."
+}

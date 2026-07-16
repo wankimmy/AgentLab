@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.5-pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentlab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentlab}
+      POSTGRES_DB: ${POSTGRES_DB:-agentlab}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentlab}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://agentlab:agentlab@postgres:5432/agentlab
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/api:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.web
+    env_file:
+      - .env
+    environment:
+      NUXT_API_BASE_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

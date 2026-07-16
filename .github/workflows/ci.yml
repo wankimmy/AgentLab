@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.5-pg16
+        env:
+          POSTGRES_USER: agentlab
+          POSTGRES_PASSWORD: agentlab
+          POSTGRES_DB: agentlab
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentlab"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgresql://agentlab:agentlab@localhost:5432/agentlab
+      REDIS_URL: redis://localhost:6379/0
+      APP_SECRET_KEY: ci-test-secret
+      OWNER_EMAIL: owner@agentlab.local
+      OWNER_PASSWORD: changeme
+      CORS_ORIGINS: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install API dependencies
+        run: pip install -r apps/api/requirements.txt
+      - name: Ruff format
+        run: cd apps/api && ruff format --check .
+      - name: Ruff lint
+        run: cd apps/api && ruff check .
+      - name: Mypy
+        run: cd apps/api && mypy app
+      - name: Pytest
+        run: cd apps/api && pytest tests/ -v
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm install
+      - name: Prepare Nuxt
+        working-directory: apps/web
+        run: npm run prepare
+      - name: Lint
+        working-directory: apps/web
+        run: npm run lint
+      - name: Typecheck
+        working-directory: apps/web
+        run: npm run typecheck
+      - name: Test
+        working-directory: apps/web
+        run: npm run test
+      - name: Build
+        working-directory: apps/web
+        run: npm run build
