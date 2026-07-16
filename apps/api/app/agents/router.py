@@ -9,8 +9,6 @@ from app.core.db import get_db
 from app.models.entities import (
     Agent,
     AgentStatus,
-    AgentTemplate,
-    AgentTemplateVersion,
     AgentVersion,
 )
 from app.schemas.common import (
@@ -20,6 +18,7 @@ from app.schemas.common import (
     AgentUpdate,
     AgentVersionResponse,
 )
+from app.services.template_service import version_defaults_from_template
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -44,25 +43,6 @@ def _agent_to_response(agent: Agent, db: Session) -> AgentResponse:
         template_id=agent.template_id,
         active_version=active_version,
     )
-
-
-def _create_version_from_template(db: Session, template_id: uuid.UUID) -> dict:
-    template = db.get(AgentTemplate, template_id)
-    if not template or not template.current_version_id:
-        raise HTTPException(status_code=404, detail="Template not found")
-    tv = db.get(AgentTemplateVersion, template.current_version_id)
-    if not tv:
-        raise HTTPException(status_code=404, detail="Template version not found")
-    return {
-        "system_prompt": tv.system_prompt,
-        "provider": tv.model_config_json.get("provider", "mock"),
-        "model": tv.model_config_json.get("model", "mock-model"),
-        "model_config_json": deepcopy(tv.model_config_json),
-        "retrieval_config": deepcopy(tv.retrieval_config),
-        "tool_config": deepcopy(tv.tool_config),
-        "memory_config": deepcopy(tv.memory_config),
-        "rag_enabled": bool(tv.retrieval_config.get("enabled", False)),
-    }
 
 
 @router.get("", response_model=AgentListResponse)
@@ -108,7 +88,7 @@ def create_agent(
         "rag_enabled": False,
     }
     if body.template_id:
-        version_defaults.update(_create_version_from_template(db, body.template_id))
+        version_defaults.update(version_defaults_from_template(db, body.template_id))
 
     agent = Agent(
         user_id=user.id,

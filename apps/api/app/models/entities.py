@@ -218,3 +218,58 @@ class AgentTemplateVersion(Base):
     template: Mapped["AgentTemplate"] = relationship(
         "AgentTemplate", back_populates="versions", foreign_keys=[template_id]
     )
+
+
+class GuideSection(str, enum.Enum):
+    foundations = "foundations"
+    building = "building"
+    evaluating = "evaluating"
+
+
+class OnboardingProgress(Base, TimestampMixin):
+    __tablename__ = "onboarding_progress"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    current_step: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    step_data: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+
+class Guide(Base, TimestampMixin):
+    __tablename__ = "guides"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    section: Mapped[GuideSection] = mapped_column(Enum(GuideSection), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    screen_link: Mapped[str | None] = mapped_column(String(255))
+
+    sections: Mapped[list["GuideSectionContent"]] = relationship(
+        back_populates="guide", order_by="GuideSectionContent.sort_order"
+    )
+
+
+class GuideSectionContent(Base):
+    __tablename__ = "guide_sections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    guide_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("guides.id"), nullable=False)
+    heading: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    guide: Mapped["Guide"] = relationship(back_populates="sections")
+
+
+class SampleDataPack(Base, TimestampMixin):
+    __tablename__ = "sample_data_packs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    is_synthetic: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    template_slug: Mapped[str | None] = mapped_column(String(100))
+    manifest: Mapped[dict] = mapped_column(JSONB, default=dict)

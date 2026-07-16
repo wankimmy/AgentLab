@@ -2,7 +2,7 @@
 
 AgentLab is an AI agent playground and evaluation platform for developers and product teams.
 
-**Status:** Phase 1 complete — foundation (auth, agents, versions, templates, CI).
+**Status:** Phase 2 complete — onboarding wizard, templates, learning centre, guidance UI.
 
 ## Quick start
 
@@ -14,6 +14,7 @@ docker compose up -d --build
 - Web: http://localhost:3000
 - API: http://localhost:8000/api/v1/health
 - Login: `owner@agentlab.local` / `changeme` (change in `.env`)
+- New users are guided through the **onboarding wizard** before reaching the dashboard.
 
 ## Development
 
@@ -48,6 +49,7 @@ cd apps/web && npm run test && npm run build
 | [System Design](docs/system-design.md) | Architecture |
 | [AGENTS.md](AGENTS.md) | AI assistant rules |
 | [Phase 1 Notes](docs/learning-notes/phase-01.md) | What Phase 1 built |
+| [Phase 2 Notes](docs/learning-notes/phase-02.md) | Onboarding, templates, learning centre |
 
 ## Stack
 

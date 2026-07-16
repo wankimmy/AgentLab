@@ -1,8 +1,16 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from app.agent_versions.router import router as versions_router
 from app.agents.router import router as agents_router
+from app.authentication.router import CurrentUser
 from app.authentication.router import router as auth_router
+from app.core.db import get_db
+from app.guides.router import router as guides_router
+from app.models.entities import Agent, AgentVersion, OnboardingProgress, ReleaseStatus
+from app.onboarding.router import router as onboarding_router
+from app.sample_packs.router import router as sample_packs_router
+from app.schemas.common import DashboardResponse
 from app.templates.router import router as templates_router
 
 api_router = APIRouter()
@@ -10,6 +18,9 @@ api_router.include_router(auth_router)
 api_router.include_router(agents_router)
 api_router.include_router(versions_router)
 api_router.include_router(templates_router)
+api_router.include_router(onboarding_router)
+api_router.include_router(guides_router)
+api_router.include_router(sample_packs_router)
 
 
 @api_router.get("/health")
@@ -36,20 +47,25 @@ def ready() -> dict[str, str | bool]:
     return {"status": status, "database": db_ok, "redis": redis_ok}
 
 
-@api_router.get("/dashboard")
-def dashboard() -> dict:
-    return {
-        "total_agents": 0,
-        "active_versions": 0,
-        "draft_versions": 0,
-        "latest_pass_rate": None,
-        "latest_release_status": None,
-        "recent_regressions": 0,
-        "recent_failed_cases": 0,
-        "avg_latency_ms": None,
-        "p95_latency_ms": None,
-        "recent_token_usage": 0,
-        "estimated_cost": 0.0,
-        "knowledge_status": "not_started",
-        "background_jobs_pending": 0,
-    }
+@api_router.get("/dashboard", response_model=DashboardResponse)
+def dashboard(user: CurrentUser, db: Session = Depends(get_db)) -> DashboardResponse:
+    total_agents = db.query(Agent).filter(Agent.user_id == user.id).count()
+    active_versions = (
+        db.query(Agent)
+        .filter(Agent.user_id == user.id, Agent.active_version_id.isnot(None))
+        .count()
+    )
+    draft_versions = (
+        db.query(AgentVersion)
+        .join(Agent, Agent.id == AgentVersion.agent_id)
+        .filter(Agent.user_id == user.id, AgentVersion.release_status == ReleaseStatus.draft)
+        .count()
+    )
+    progress = db.get(OnboardingProgress, user.id)
+    onboarding_complete = progress.completed if progress else False
+    return DashboardResponse(
+        total_agents=total_agents,
+        active_versions=active_versions,
+        draft_versions=draft_versions,
+        onboarding_complete=onboarding_complete,
+    )

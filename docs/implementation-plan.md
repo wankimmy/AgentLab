@@ -63,13 +63,13 @@ curl http://localhost:8000/api/v1/health
 
 ### Deliverables
 
-- [ ] Onboarding wizard (8 steps, saved progress)
-- [ ] Template browse/preview/apply UI
-- [ ] Template seed data with full config (prompts, eval packs, rubrics)
-- [ ] Inline help panels on major pages
-- [ ] Guided empty states (no agents, knowledge, datasets, evals)
-- [ ] Learning centre with foundation guides (seed content)
-- [ ] Sample pack data model + ERP pack stub
+- [x] Onboarding wizard (8 steps, saved progress)
+- [x] Template browse/preview/apply UI
+- [x] Template seed data with full config (prompts, eval packs, rubrics)
+- [x] Inline help panels on major pages
+- [x] Guided empty states (no agents, knowledge, datasets, evals)
+- [x] Learning centre with foundation guides (seed content)
+- [x] Sample pack data model + ERP pack stub
 
 ### Acceptance criteria
 

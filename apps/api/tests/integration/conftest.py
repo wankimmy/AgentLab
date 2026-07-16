@@ -8,7 +8,7 @@ from app.core.db import Base, get_db
 from app.core.security import hash_password
 from app.main import app
 from app.models.entities import User, UserRole
-from app.seed import seed_owner, seed_templates, seed_tools
+from app.seed import seed_guides, seed_owner, seed_sample_packs, seed_templates, seed_tools
 
 engine = create_engine(settings.database_url)
 TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
@@ -22,6 +22,8 @@ def setup_database():
         seed_owner(db)
         seed_tools(db)
         seed_templates(db)
+        seed_guides(db)
+        seed_sample_packs(db)
         db.commit()
     yield
     Base.metadata.drop_all(bind=engine)

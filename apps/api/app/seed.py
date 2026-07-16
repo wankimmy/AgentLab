@@ -1,18 +1,24 @@
-"""Seed owner user, tools, and agent templates."""
+"""Seed owner user, tools, templates, guides, and sample packs."""
+
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.db import SessionLocal
 from app.core.security import hash_password
 from app.models.entities import (
     AgentTemplate,
     AgentTemplateVersion,
+    Guide,
+    GuideSection,
+    GuideSectionContent,
     RiskLevel,
+    SampleDataPack,
     Tool,
     User,
     UserRole,
 )
+from app.seed_data import GUIDES, template_version_data
 
 TOOLS = [
     {
@@ -23,10 +29,7 @@ TOOLS = [
             "properties": {"expression": {"type": "string"}},
             "required": ["expression"],
         },
-        "output_schema": {
-            "type": "object",
-            "properties": {"result": {"type": "number"}},
-        },
+        "output_schema": {"type": "object", "properties": {"result": {"type": "number"}}},
         "risk_level": RiskLevel.low,
     },
     {
@@ -44,10 +47,7 @@ TOOLS = [
         "name": "current_datetime",
         "description": "Return server-controlled date and time.",
         "input_schema": {"type": "object", "properties": {}},
-        "output_schema": {
-            "type": "object",
-            "properties": {"datetime_utc": {"type": "string"}},
-        },
+        "output_schema": {"type": "object", "properties": {"datetime_utc": {"type": "string"}}},
         "risk_level": RiskLevel.low,
     },
 ]
@@ -109,28 +109,18 @@ TEMPLATES = [
     },
 ]
 
-DEFAULT_PROMPT = """ROLE
-You are a helpful assistant.
-
-PRIMARY OBJECTIVE
-Answer questions accurately using approved knowledge only.
-
-WHEN INFORMATION IS MISSING
-State that approved knowledge does not contain enough information.
-"""
-
 
 def seed_owner(db: Session) -> None:
-    existing = db.query(User).filter(User.email == settings.owner_email).first()
-    if existing:
+    if db.query(User).filter(User.email == settings.owner_email).first():
         return
-    user = User(
-        email=settings.owner_email,
-        password_hash=hash_password(settings.owner_password),
-        role=UserRole.owner,
-        is_active=True,
+    db.add(
+        User(
+            email=settings.owner_email,
+            password_hash=hash_password(settings.owner_password),
+            role=UserRole.owner,
+            is_active=True,
+        )
     )
-    db.add(user)
 
 
 def seed_tools(db: Session) -> None:
@@ -140,42 +130,105 @@ def seed_tools(db: Session) -> None:
         db.add(Tool(**tool_data))
 
 
+def _upsert_template_version(db: Session, template: AgentTemplate, tpl: dict) -> None:
+    rich = tpl["slug"] == "erp-support"
+    data = template_version_data(tpl["slug"], tpl["name"], rich=rich)
+    if template.current_version_id:
+        tv = db.get(AgentTemplateVersion, template.current_version_id)
+        if tv:
+            for key, value in data.items():
+                setattr(tv, key, value)
+            return
+    version = AgentTemplateVersion(template_id=template.id, version_number=1, **data)
+    db.add(version)
+    db.flush()
+    template.current_version_id = version.id
+
+
 def seed_templates(db: Session) -> None:
     for tpl in TEMPLATES:
-        existing = db.query(AgentTemplate).filter(AgentTemplate.slug == tpl["slug"]).first()
-        if existing:
-            continue
-        template = AgentTemplate(
-            slug=tpl["slug"],
-            name=tpl["name"],
-            description=f"Template for {tpl['name']}.",
-            intended_use=f"Use for {tpl['name']} scenarios.",
-            not_suitable_for="Not for unverified or high-risk autonomous actions.",
-            target_users="Internal users and support staff.",
-            risk_level=tpl["risk_level"],
-            setup_effort=tpl["setup_effort"],
+        template = db.query(AgentTemplate).filter(AgentTemplate.slug == tpl["slug"]).first()
+        if not template:
+            template = AgentTemplate(
+                slug=tpl["slug"],
+                name=tpl["name"],
+                description=f"Template for {tpl['name']}.",
+                intended_use=f"Use for {tpl['name']} scenarios.",
+                not_suitable_for="Not for unverified or high-risk autonomous actions.",
+                target_users="Internal users and support staff.",
+                risk_level=tpl["risk_level"],
+                setup_effort=tpl["setup_effort"],
+            )
+            db.add(template)
+            db.flush()
+        _upsert_template_version(db, template, tpl)
+
+
+def seed_guides(db: Session) -> None:
+    for idx, raw_guide in enumerate(GUIDES):
+        guide_data = cast(dict[str, Any], raw_guide)
+        guide = db.query(Guide).filter(Guide.slug == guide_data["slug"]).first()
+        if not guide:
+            guide = Guide(
+                slug=guide_data["slug"],
+                title=guide_data["title"],
+                section=GuideSection(guide_data["section"]),
+                summary=guide_data["summary"],
+                sort_order=idx,
+                screen_link=guide_data.get("screen_link"),
+            )
+            db.add(guide)
+            db.flush()
+            for sidx, section in enumerate(
+                cast(list[dict[str, Any]], guide_data.get("sections", []))
+            ):
+                db.add(
+                    GuideSectionContent(
+                        guide_id=guide.id,
+                        heading=section["heading"],
+                        content=section["content"],
+                        sort_order=sidx,
+                    )
+                )
+        else:
+            guide.title = guide_data["title"]
+            guide.summary = guide_data["summary"]
+            guide.sort_order = idx
+
+
+def seed_sample_packs(db: Session) -> None:
+    pack = db.query(SampleDataPack).filter(SampleDataPack.slug == "erp-support").first()
+    if pack:
+        return
+    db.add(
+        SampleDataPack(
+            slug="erp-support",
+            name="ERP Support Sample Pack",
+            description=(
+                "Synthetic ERP support agent, knowledge stubs, "
+                "and evaluation cases for portfolio demo."
+            ),
+            is_synthetic=True,
+            template_slug="erp-support",
+            manifest={
+                "label": "SYNTHETIC DATA",
+                "includes": ["agent_template", "eval_starter_pack", "security_cases"],
+                "knowledge_docs": 7,
+                "eval_cases": 25,
+            },
         )
-        db.add(template)
-        db.flush()
-        version = AgentTemplateVersion(
-            template_id=template.id,
-            version_number=1,
-            system_prompt=DEFAULT_PROMPT.replace("helpful assistant", tpl["name"]),
-            model_config_json={"provider": "mock", "model": "mock-model", "temperature": 0.3},
-            retrieval_config={"enabled": tpl["slug"] != "empty", "top_k": 5},
-            tool_config={"calculator": "auto", "knowledge_search": "auto"},
-            memory_config={"mode": "conversation"},
-        )
-        db.add(version)
-        db.flush()
-        template.current_version_id = version.id
+    )
 
 
 def run_seed() -> None:
+    from app.core.db import SessionLocal
+
     with SessionLocal() as db:
         seed_owner(db)
         seed_tools(db)
         seed_templates(db)
+        seed_guides(db)
+        seed_sample_packs(db)
         db.commit()
     print("Seed completed.")
 
