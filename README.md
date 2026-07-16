@@ -2,7 +2,7 @@
 
 AgentLab is an AI agent playground and evaluation platform for developers and product teams.
 
-**Status:** Phase 5 complete — native tool runtime, approval flow, audit logging.
+**Status:** Phase 6 complete — evaluation datasets, metrics engine, background eval runs.
 
 ## Quick start
 
@@ -18,6 +18,7 @@ docker compose up -d --build
 - Playground uses **MockProvider** by default; set `AI_BASE_URL` and `AI_API_KEY` in `.env` for live OpenAI-compatible chat.
 - Knowledge processing uses **mock embeddings** by default; set `EMBEDDING_API_KEY` for live embedding APIs. Celery `worker` service processes uploads when the stack runs under Docker Compose.
 - Playground **tools** use MockProvider patterns (`calculate: 2+2`, `what time`, `search: query`) unless `AI_API_KEY` is set for live tool-calling models.
+- **Evaluations:** `/evaluations` → create a dataset (or import from template) → **New run** → estimate cost → Quick Check. Results show pass/fail and failure explanations per case.
 
 ## Development
 
@@ -56,6 +57,7 @@ cd apps/web && npm run test && npm run build
 | [Phase 3 Notes](docs/learning-notes/phase-03.md) | Playground, streaming, traces |
 | [Phase 4 Notes](docs/learning-notes/phase-04.md) | Knowledge, RAG, retrieval debugger |
 | [Phase 5 Notes](docs/learning-notes/phase-05.md) | Tools, approval, native runtime |
+| [Phase 6 Notes](docs/learning-notes/phase-06.md) | Evaluation datasets, metrics, background runs |
 
 ## Stack
 

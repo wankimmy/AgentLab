@@ -562,3 +562,175 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class CaseSeverity(str, enum.Enum):
+    critical = "critical"
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
+class CaseStatus(str, enum.Enum):
+    draft = "draft"
+    approved = "approved"
+
+
+class EvalMode(str, enum.Enum):
+    quick = "quick"
+    standard = "standard"
+    release = "release"
+
+
+class RunStatus(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class ResultStatus(str, enum.Enum):
+    passed = "passed"
+    failed = "failed"
+    error = "error"
+    needs_review = "needs_review"
+
+
+class MetricType(str, enum.Enum):
+    deterministic = "deterministic"
+    semantic = "semantic"
+    rag = "rag"
+    tool = "tool"
+    judge = "judge"
+
+
+class EvaluationDataset(Base, TimestampMixin):
+    __tablename__ = "evaluation_datasets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("agents.id"))
+    template_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("agent_templates.id"))
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+
+    versions: Mapped[list["EvaluationDatasetVersion"]] = relationship(
+        back_populates="dataset", order_by="EvaluationDatasetVersion.version_number"
+    )
+
+
+class EvaluationDatasetVersion(Base):
+    __tablename__ = "evaluation_dataset_versions"
+    __table_args__ = (UniqueConstraint("dataset_id", "version_number", name="uq_dataset_version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    dataset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evaluation_datasets.id"), nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    dataset: Mapped["EvaluationDataset"] = relationship(back_populates="versions")
+    cases: Mapped[list["EvaluationCase"]] = relationship(back_populates="dataset_version")
+
+
+class EvaluationCase(Base):
+    __tablename__ = "evaluation_cases"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    dataset_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evaluation_dataset_versions.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str] = mapped_column(String(100), default="")
+    user_message: Mapped[str] = mapped_column(Text, nullable=False)
+    conversation_history: Mapped[dict | None] = mapped_column(JSONB)
+    expected_answer: Mapped[str | None] = mapped_column(Text)
+    expected_behaviour: Mapped[str | None] = mapped_column(Text)
+    required_keywords: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    forbidden_keywords: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    forbidden_claims: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    expected_source: Mapped[str | None] = mapped_column(String(255))
+    expected_citation: Mapped[str | None] = mapped_column(String(255))
+    expected_tool: Mapped[str | None] = mapped_column(String(100))
+    expected_tool_args: Mapped[dict | None] = mapped_column(JSONB)
+    max_latency_ms: Mapped[int | None] = mapped_column(Integer)
+    max_tokens: Mapped[int | None] = mapped_column(Integer)
+    max_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    min_judge_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    severity: Mapped[CaseSeverity] = mapped_column(Enum(CaseSeverity), default=CaseSeverity.medium)
+    importance_weight: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("1"))
+    tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    notes: Mapped[str | None] = mapped_column(Text)
+    requires_human_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.approved)
+
+    dataset_version: Mapped["EvaluationDatasetVersion"] = relationship(back_populates="cases")
+
+
+class EvaluationRun(Base):
+    __tablename__ = "evaluation_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=False
+    )
+    dataset_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evaluation_dataset_versions.id"), nullable=False
+    )
+    mode: Mapped[EvalMode] = mapped_column(Enum(EvalMode), default=EvalMode.quick)
+    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus), default=RunStatus.pending)
+    judge_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    judge_model: Mapped[str | None] = mapped_column(String(100))
+    pass_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    total_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    mlflow_run_id: Mapped[str | None] = mapped_column(String(100))
+    config_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    results: Mapped[list["EvaluationResult"]] = relationship(back_populates="run")
+
+
+class EvaluationResult(Base):
+    __tablename__ = "evaluation_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluation_runs.id"), nullable=False)
+    case_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluation_cases.id"), nullable=False)
+    status: Mapped[ResultStatus] = mapped_column(Enum(ResultStatus), nullable=False)
+    actual_answer: Mapped[str] = mapped_column(Text, default="")
+    overall_pass: Mapped[bool] = mapped_column(Boolean, default=False)
+    failure_explanation: Mapped[str | None] = mapped_column(Text)
+    trace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("chat_traces.id"))
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal("0"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    run: Mapped["EvaluationRun"] = relationship(back_populates="results")
+    metrics: Mapped[list["MetricResult"]] = relationship(back_populates="result")
+
+
+class MetricResult(Base):
+    __tablename__ = "metric_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    result_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evaluation_results.id"), nullable=False
+    )
+    metric_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    metric_type: Mapped[MetricType] = mapped_column(Enum(MetricType), nullable=False)
+    passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    score: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+    threshold: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+    details: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    result: Mapped["EvaluationResult"] = relationship(back_populates="metrics")

@@ -3,8 +3,9 @@
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "006_phase6"
 down_revision: str | None = "005_phase5"
@@ -31,9 +32,13 @@ def upgrade() -> None:
     op.create_table(
         "evaluation_datasets",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False
+        ),
         sa.Column("agent_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("agents.id")),
-        sa.Column("template_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("agent_templates.id")),
+        sa.Column(
+            "template_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("agent_templates.id")
+        ),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("description", sa.Text(), server_default=""),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),

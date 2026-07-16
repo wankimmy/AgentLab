@@ -204,17 +204,17 @@ cd apps/api && pytest tests/unit/test_calculator_tool.py tests/integration/test_
 
 ### Deliverables
 
-- [ ] Evaluation dataset + version CRUD
-- [ ] Test case CRUD + CSV/JSON import/export
-- [ ] Evaluation templates (8 presets)
-- [ ] Deterministic metrics engine (all metrics from eval design)
-- [ ] Semantic similarity metric
-- [ ] RAG metrics (retrieval, citation)
-- [ ] Tool metrics
-- [ ] Quick Check and Standard modes
-- [ ] Celery evaluation worker
-- [ ] Eval run UI (estimate → confirm → progress → results)
-- [ ] Failure explanations
+- [x] Evaluation dataset + version CRUD
+- [x] Test case CRUD + CSV/JSON import/export
+- [x] Evaluation templates (8 presets)
+- [x] Deterministic metrics engine (all metrics from eval design)
+- [x] Semantic similarity metric
+- [x] RAG metrics (retrieval, citation)
+- [x] Tool metrics
+- [x] Quick Check and Standard modes
+- [x] Celery evaluation worker
+- [x] Eval run UI (estimate → confirm → progress → results)
+- [x] Failure explanations
 
 ### Acceptance criteria
 

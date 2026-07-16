@@ -24,3 +24,12 @@ def process_document_task(document_id: str) -> None:
 @celery_app.task(name="reindex_document")
 def reindex_document_task(document_id: str) -> None:
     process_document_task(document_id)
+
+
+@celery_app.task(name="run_evaluation")
+def run_evaluation_task(run_id: str) -> None:
+    import uuid
+
+    from app.evaluations.runner import run_evaluation_sync
+
+    run_evaluation_sync(uuid.UUID(run_id))

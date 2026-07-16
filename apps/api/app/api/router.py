@@ -7,6 +7,7 @@ from app.authentication.router import CurrentUser
 from app.authentication.router import router as auth_router
 from app.conversations.router import router as conversations_router
 from app.core.db import get_db
+from app.evaluations.router import router as evaluations_router
 from app.guides.router import router as guides_router
 from app.knowledge.retrieval_router import router as retrieval_router
 from app.knowledge.retrieval_router import version_router as version_collections_router
@@ -39,6 +40,7 @@ api_router.include_router(retrieval_router)
 api_router.include_router(version_collections_router)
 api_router.include_router(tools_router)
 api_router.include_router(tool_approvals_router)
+api_router.include_router(evaluations_router)
 
 
 @api_router.get("/health")
