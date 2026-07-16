@@ -21,6 +21,7 @@ from app.providers.base import ChatRequest
 from app.providers.registry import get_provider
 from app.services.cost_service import estimate_cost
 from app.services.retrieval_service import RetrievalService, build_rag_context_block
+from app.tools.registry import has_enabled_tools
 
 SUMMARY_RECENT_MESSAGES = 20
 
@@ -101,6 +102,16 @@ async def stream_chat_turn(
     user_content: str,
     overrides: TurnOverrides | None = None,
 ) -> AsyncIterator[StreamResult]:
+    if has_enabled_tools(version):
+        from app.services.native_runtime import resolve_user_id, stream_native_turn
+
+        user_id = resolve_user_id(db, conversation)
+        async for result in stream_native_turn(
+            db, conversation, version, user_content, overrides, user_id
+        ):
+            yield result
+        return
+
     next_seq = len(conversation.messages)
     user_msg = Message(
         conversation_id=conversation.id,

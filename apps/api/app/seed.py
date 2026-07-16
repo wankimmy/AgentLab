@@ -229,7 +229,7 @@ MODELS = [
         "model": "mock-model",
         "context_limit": 8192,
         "streaming": True,
-        "tool_calling": False,
+        "tool_calling": True,
         "input_cost": Decimal("0"),
         "output_cost": Decimal("0"),
     },
@@ -265,6 +265,8 @@ def seed_models(db: Session) -> None:
             )
             db.add(reg)
             db.flush()
+        else:
+            reg.tool_calling = bool(entry["tool_calling"])
         pricing = (
             db.query(ModelPricing)
             .filter(

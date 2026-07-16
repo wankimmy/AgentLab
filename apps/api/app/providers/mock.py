@@ -1,59 +1,1 @@
-import asyncio
-import hashlib
-from collections.abc import AsyncGenerator
-
-from app.providers.base import ChatRequest, ChatResponse, StreamEvent
-
-
-class MockProvider:
-    """Deterministic mock provider for CI and local development."""
-
-    def __init__(self, scenario: str | None = None) -> None:
-        self.scenario = scenario
-
-    def _build_content(self, messages: list[dict], model: str) -> str:
-        last_user = next(
-            (m["content"] for m in reversed(messages) if m.get("role") == "user"),
-            "",
-        )
-        digest = hashlib.sha256(last_user.encode()).hexdigest()[:8]
-        return f"[mock:{model}] Response for: {last_user[:80]} (id={digest})"
-
-    def _token_counts(self, messages: list[dict], content: str) -> tuple[int, int]:
-        input_text = " ".join(m.get("content", "") for m in messages)
-        return len(input_text.split()), len(content.split())
-
-    async def complete(self, request: ChatRequest) -> ChatResponse:
-        if self.scenario == "timeout":
-            await asyncio.sleep(0.01)
-            raise TimeoutError("Mock timeout scenario")
-        if self.scenario == "rate_limit":
-            raise RuntimeError("rate_limit")
-        content = self._build_content(request.messages, request.model)
-        in_tok, out_tok = self._token_counts(request.messages, content)
-        return ChatResponse(content=content, input_tokens=in_tok, output_tokens=out_tok)
-
-    async def stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]:
-        if self.scenario == "timeout":
-            await asyncio.sleep(0.01)
-            yield StreamEvent(type="error", error_code="timeout", error_message="Mock timeout")
-            return
-        if self.scenario == "rate_limit":
-            yield StreamEvent(
-                type="error", error_code="rate_limit", error_message="Mock rate limit"
-            )
-            return
-
-        content = self._build_content(request.messages, request.model)
-        in_tok, out_tok = self._token_counts(request.messages, content)
-        words = content.split(" ")
-        for i, word in enumerate(words):
-            await asyncio.sleep(0)
-            chunk = word if i == 0 else f" {word}"
-            yield StreamEvent(type="token", content=chunk)
-        yield StreamEvent(
-            type="done",
-            content=content,
-            input_tokens=in_tok,
-            output_tokens=out_tok,
-        )
+import asyncioimport hashlibimport reimport uuidfrom collections.abc import AsyncGeneratorfrom app.providers.base import ChatRequest, ChatResponse, StreamEventclass MockProvider:    """Deterministic mock provider for CI and local development."""    def __init__(self, scenario: str | None = None) -> None:        self.scenario = scenario    def _last_user(self, messages: list[dict]) -> str:        return next(            (m["content"] for m in reversed(messages) if m.get("role") == "user"),            "",        )    def _build_content(self, messages: list[dict], model: str) -> str:        tool_msgs = [m for m in messages if m.get("role") == "tool"]        if tool_msgs:            last_tool = tool_msgs[-1]["content"]            return f"[mock:{model}] Tool result applied: {last_tool[:200]}"        last_user = self._last_user(messages)        digest = hashlib.sha256(last_user.encode()).hexdigest()[:8]        return f"[mock:{model}] Response for: {last_user[:80]} (id={digest})"    def _token_counts(self, messages: list[dict], content: str) -> tuple[int, int]:        input_text = " ".join(m.get("content", "") for m in messages)        return len(input_text.split()), len(content.split())    def _detect_tool_call(self, messages: list[dict], tools: list[dict]) -> dict | None:        if any(m.get("role") == "tool" for m in messages):            return None        user = self._last_user(messages).strip()        lower = user.lower()        names = {t["function"]["name"] for t in tools if t.get("type") == "function"}        if "calculator" in names and (            lower.startswith("calculate:") or re.search(r"\d+\s*[\+\-\*/%]\s*\d+", user)        ):            expr = user.split(":", 1)[1].strip() if ":" in user else user            return {                "id": f"call_{uuid.uuid4().hex[:8]}",                "name": "calculator",                "arguments": {"expression": expr},            }        if "current_datetime" in names and ("what time" in lower or "current time" in lower):            return {                "id": f"call_{uuid.uuid4().hex[:8]}",                "name": "current_datetime",                "arguments": {"timezone": "UTC"},            }        if "knowledge_search" in names and lower.startswith("search:"):            query = user.split(":", 1)[1].strip()            return {                "id": f"call_{uuid.uuid4().hex[:8]}",                "name": "knowledge_search",                "arguments": {"query": query},            }        return None    async def complete(self, request: ChatRequest) -> ChatResponse:        if self.scenario == "timeout":            await asyncio.sleep(0.01)            raise TimeoutError("Mock timeout scenario")        if self.scenario == "rate_limit":            raise RuntimeError("rate_limit")        content = self._build_content(request.messages, request.model)        in_tok, out_tok = self._token_counts(request.messages, content)        return ChatResponse(content=content, input_tokens=in_tok, output_tokens=out_tok)    async def stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]:        if self.scenario == "timeout":            await asyncio.sleep(0.01)            yield StreamEvent(type="error", error_code="timeout", error_message="Mock timeout")            return        if self.scenario == "rate_limit":            yield StreamEvent(                type="error", error_code="rate_limit", error_message="Mock rate limit"            )            return        if request.tools and not any(m.get("role") == "tool" for m in request.messages):            detected = self._detect_tool_call(request.messages, request.tools)            if detected:                yield StreamEvent(type="tool_calls", metadata={"tool_calls": [detected]})                return        content = self._build_content(request.messages, request.model)        in_tok, out_tok = self._token_counts(request.messages, content)        words = content.split(" ")        for i, word in enumerate(words):            await asyncio.sleep(0)            chunk = word if i == 0 else f" {word}"            yield StreamEvent(type="token", content=chunk)        yield StreamEvent(            type="done",            content=content,            input_tokens=in_tok,            output_tokens=out_tok,        )

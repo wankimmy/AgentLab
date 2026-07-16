@@ -21,6 +21,13 @@ const trace = ref<TraceData | null>(null)
 const traceLoading = ref(false)
 const saving = ref(false)
 const mobileTab = ref<'chat' | 'config' | 'trace'>('chat')
+const pendingApproval = ref<{
+  approval_id: string
+  tool: string
+  arguments: Record<string, unknown>
+} | null>(null)
+const approvalBusy = ref(false)
+const toolActivity = ref<string[]>([])
 
 interface AgentVersion {
   id: string
@@ -99,6 +106,8 @@ async function sendMessage(content: string) {
   if (!conversationId.value) return
   streaming.value = true
   streamingContent.value = ''
+  pendingApproval.value = null
+  toolActivity.value = []
   const overrides = store.apiOverrides
   try {
     await streamPost(
@@ -108,7 +117,21 @@ async function sendMessage(content: string) {
         if (evt.event === 'token') {
           streamingContent.value += String(evt.data.content || '')
         }
+        if (evt.event === 'tool_call') {
+          toolActivity.value.push(`Called ${evt.data.tool}`)
+        }
+        if (evt.event === 'tool_result') {
+          toolActivity.value.push(`Result: ${evt.data.tool} (${evt.data.status})`)
+        }
+        if (evt.event === 'approval_required') {
+          pendingApproval.value = {
+            approval_id: String(evt.data.approval_id),
+            tool: String(evt.data.tool),
+            arguments: (evt.data.arguments as Record<string, unknown>) || {},
+          }
+        }
         if (evt.event === 'done' && evt.data.trace_id) {
+          pendingApproval.value = null
           await loadConversation(conversationId.value!)
         }
         if (evt.event === 'error') {
@@ -119,6 +142,21 @@ async function sendMessage(content: string) {
   } finally {
     streaming.value = false
     streamingContent.value = ''
+    pendingApproval.value = null
+  }
+}
+
+async function decideApproval(approve: boolean) {
+  if (!pendingApproval.value) return
+  approvalBusy.value = true
+  const { api } = useApi()
+  const path = approve ? 'approve' : 'reject'
+  try {
+    await api(`/tool-approvals/${pendingApproval.value.approval_id}/${path}`, {
+      method: 'POST',
+    })
+  } finally {
+    approvalBusy.value = false
   }
 }
 
@@ -194,6 +232,34 @@ async function saveAsVersion() {
         <PlaygroundConfigPanel />
       </aside>
       <section class="lg:col-span-5" :class="mobileTab === 'chat' ? 'block' : 'hidden lg:block'">
+        <div
+          v-if="pendingApproval"
+          class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm"
+        >
+          <p class="font-medium text-amber-900">Tool approval required: {{ pendingApproval.tool }}</p>
+          <pre class="mono mt-2 text-xs">{{ JSON.stringify(pendingApproval.arguments, null, 2) }}</pre>
+          <div class="mt-3 flex gap-2">
+            <button
+              type="button"
+              class="rounded bg-[var(--accent)] px-3 py-1.5 text-white disabled:opacity-50"
+              :disabled="approvalBusy"
+              @click="decideApproval(true)"
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              class="rounded border border-[var(--border)] px-3 py-1.5 disabled:opacity-50"
+              :disabled="approvalBusy"
+              @click="decideApproval(false)"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+        <ul v-if="toolActivity.length" class="mb-4 space-y-1 text-xs text-[var(--muted)]">
+          <li v-for="(line, i) in toolActivity" :key="i">{{ line }}</li>
+        </ul>
         <ChatPanel
           :messages="messages"
           :streaming="streaming"

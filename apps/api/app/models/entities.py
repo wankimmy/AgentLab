@@ -518,3 +518,47 @@ class BackgroundJob(Base, TimestampMixin):
     document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id"))
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
     error: Mapped[str | None] = mapped_column(Text)
+
+
+class ToolApprovalStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    expired = "expired"
+
+
+class ToolApproval(Base):
+    __tablename__ = "tool_approvals"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversations.id"), nullable=False
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("messages.id"))
+    trace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("chat_traces.id"))
+    tool_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    tool_call_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    arguments: Mapped[dict] = mapped_column(JSONB, default=dict)
+    status: Mapped[ToolApprovalStatus] = mapped_column(
+        Enum(ToolApprovalStatus), default=ToolApprovalStatus.pending
+    )
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    resource_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    details: Mapped[dict] = mapped_column(JSONB, default=dict)
+    trace_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("chat_traces.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

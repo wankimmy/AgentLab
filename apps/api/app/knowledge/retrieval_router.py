@@ -16,6 +16,7 @@ from app.schemas.knowledge import (
     VersionCollectionsUpdate,
     VersionRagUpdate,
 )
+from app.schemas.tools import VersionToolsUpdate
 from app.services.retrieval_service import RetrievalService
 
 router = APIRouter(prefix="/knowledge/retrieval", tags=["knowledge-retrieval"])
@@ -154,3 +155,17 @@ def patch_version_rag(
         "rag_enabled": version.rag_enabled,
         "retrieval_config": version.retrieval_config,
     }
+
+
+@version_router.patch("/{version_id}/tools", response_model=dict)
+def patch_version_tools(
+    agent_id: uuid.UUID,
+    version_id: uuid.UUID,
+    body: VersionToolsUpdate,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    version = _get_version(agent_id, version_id, user, db)
+    version.tool_config = body.tool_config
+    db.commit()
+    return {"tool_config": version.tool_config}

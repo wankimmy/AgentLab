@@ -170,14 +170,14 @@ npx playwright test tests/e2e/knowledge-upload.spec.ts
 
 ### Deliverables
 
-- [ ] Native runtime loop (steps, tools, streaming, limits)
-- [ ] Calculator tool (safe parser, no eval)
-- [ ] Knowledge search tool
-- [ ] Current datetime tool
-- [ ] Tool approval flow (SSE + approve/reject API)
-- [ ] Audit logging for tool executions
-- [ ] RAG safety delimiters in context assembly
-- [ ] Guardrails (input/output limits, allowlist)
+- [x] Native runtime loop (steps, tools, streaming, limits)
+- [x] Calculator tool (safe parser, no eval)
+- [x] Knowledge search tool
+- [x] Current datetime tool
+- [x] Tool approval flow (SSE + approve/reject API)
+- [x] Audit logging for tool executions
+- [x] RAG safety delimiters in context assembly
+- [x] Guardrails (input/output limits, allowlist)
 
 ### Acceptance criteria
 

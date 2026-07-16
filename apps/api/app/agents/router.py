@@ -18,6 +18,7 @@ from app.schemas.common import (
     AgentUpdate,
     AgentVersionResponse,
 )
+from app.seed_data import DEFAULT_TOOL_CONFIG
 from app.services.template_service import version_defaults_from_template
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -83,7 +84,7 @@ def create_agent(
         "model": body.model,
         "model_config_json": {"temperature": 0.3, "max_tokens": 1024},
         "retrieval_config": {},
-        "tool_config": {},
+        "tool_config": deepcopy(DEFAULT_TOOL_CONFIG),
         "memory_config": {"mode": "conversation"},
         "rag_enabled": False,
     }

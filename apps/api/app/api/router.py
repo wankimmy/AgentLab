@@ -18,6 +18,8 @@ from app.onboarding.router import router as onboarding_router
 from app.sample_packs.router import router as sample_packs_router
 from app.schemas.common import DashboardResponse
 from app.templates.router import router as templates_router
+from app.tool_approvals.router import router as tool_approvals_router
+from app.tools.router import router as tools_router
 from app.traces.router import router as traces_router
 
 api_router = APIRouter()
@@ -35,6 +37,8 @@ api_router.include_router(models_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(retrieval_router)
 api_router.include_router(version_collections_router)
+api_router.include_router(tools_router)
+api_router.include_router(tool_approvals_router)
 
 
 @api_router.get("/health")
