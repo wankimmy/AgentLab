@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'auth' })
+definePageMeta({ middleware: ['auth', 'onboarding'] })
 
 const route = useRoute()
 const agentId = route.params.id as string
@@ -56,6 +56,15 @@ async function createVersion() {
     <h1 class="mt-4 text-3xl font-semibold">{{ agent.name }}</h1>
     <p class="mt-1 text-[var(--muted)]">{{ agent.status }} · Active v{{ agent.active_version?.version_number }}</p>
 
+    <div v-if="agent.active_version" class="mt-4">
+      <NuxtLink
+        :to="`/playground/${agent.active_version.id}?agentId=${agent.id}`"
+        class="inline-block rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)]"
+      >
+        Open playground
+      </NuxtLink>
+    </div>
+
     <section class="mt-8 rounded-xl border border-[var(--border)] bg-white p-6">
       <h2 class="text-lg font-medium">Active prompt</h2>
       <pre class="mono mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-4 text-sm">{{ agent.active_version?.system_prompt }}</pre>
@@ -71,7 +80,15 @@ async function createVersion() {
         >
           <div class="flex items-center justify-between">
             <span class="font-medium">v{{ version.version_number }}</span>
-            <span class="text-sm text-[var(--muted)]">{{ version.release_status }}</span>
+            <div class="flex items-center gap-3">
+              <NuxtLink
+                :to="`/playground/${version.id}?agentId=${agentId}`"
+                class="text-sm text-[var(--accent)] hover:underline"
+              >
+                Playground
+              </NuxtLink>
+              <span class="text-sm text-[var(--muted)]">{{ version.release_status }}</span>
+            </div>
           </div>
           <p class="mt-2 line-clamp-2 text-sm text-[var(--muted)]">{{ version.system_prompt }}</p>
         </div>

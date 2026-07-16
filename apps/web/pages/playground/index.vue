@@ -1,32 +1,51 @@
 <script setup lang="ts">
 definePageMeta({ middleware: ['auth', 'onboarding'] })
+
+interface Agent {
+  id: string
+  name: string
+  active_version?: { id: string; version_number: number }
+}
+
+interface AgentList {
+  items: Agent[]
+}
+
+const { api } = useApi()
+const agents = ref<Agent[]>([])
+
+onMounted(async () => {
+  const data = await api<AgentList>('/agents')
+  agents.value = data.items.filter((a) => a.active_version)
+})
 </script>
 
 <template>
   <div>
     <h1 class="text-3xl font-semibold">Playground</h1>
-    <p class="mt-1 text-[var(--muted)]">Interactive agent testing — Phase 3</p>
+    <p class="mt-1 text-[var(--muted)]">Select an agent version to test</p>
 
-    <div class="mt-8 grid gap-6 lg:grid-cols-3">
-      <div class="lg:col-span-2">
-        <EmptyState
-          title="Playground coming in Phase 3"
-          description="You will stream test messages, inspect tool calls, and compare versions here."
-          :actions="[
-            { label: 'Continue onboarding', to: '/onboarding', primary: true },
-            { label: 'View agents', to: '/agents' },
-          ]"
-        />
-        <p class="mt-4 text-sm text-[var(--muted)]">
-          Suggested first question: “How do I create a purchase requisition?”
-        </p>
-      </div>
-      <HelpPanel
-        title="Using the playground"
-        why="Manual testing catches issues before formal evaluation runs."
-        :steps="['Select agent version', 'Send a realistic user message', 'Check citations and refusals']"
-        :verify="['Unsupported questions are refused', 'Tool calls match configuration']"
-      />
+    <EmptyState
+      v-if="agents.length === 0"
+      class="mt-8"
+      title="No agents ready for playground"
+      description="Create an agent with an active version first."
+      :actions="[
+        { label: 'Create agent', to: '/agents/new', primary: true },
+        { label: 'Browse templates', to: '/templates' },
+      ]"
+    />
+
+    <div v-else class="mt-8 space-y-3">
+      <NuxtLink
+        v-for="agent in agents"
+        :key="agent.id"
+        :to="`/playground/${agent.active_version!.id}?agentId=${agent.id}`"
+        class="block rounded-xl border border-[var(--border)] bg-white p-5 hover:border-[var(--accent)]"
+      >
+        <h2 class="font-medium">{{ agent.name }}</h2>
+        <p class="mt-1 text-sm text-[var(--muted)]">Active version v{{ agent.active_version!.version_number }}</p>
+      </NuxtLink>
     </div>
   </div>
 </template>

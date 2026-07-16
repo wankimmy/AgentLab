@@ -1,0 +1,35 @@
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
+from typing import Any, Literal, Protocol
+
+
+@dataclass
+class ChatRequest:
+    model: str
+    messages: list[dict[str, Any]]
+    temperature: float = 0.3
+    max_tokens: int = 1024
+
+
+@dataclass
+class ChatResponse:
+    content: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+
+@dataclass
+class StreamEvent:
+    type: Literal["token", "done", "error"]
+    content: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    error_code: str | None = None
+    error_message: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+class ChatProvider(Protocol):
+    async def complete(self, request: ChatRequest) -> ChatResponse: ...
+
+    def stream(self, request: ChatRequest) -> AsyncGenerator[StreamEvent, None]: ...

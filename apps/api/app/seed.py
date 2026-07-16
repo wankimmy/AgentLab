@@ -1,5 +1,6 @@
-"""Seed owner user, tools, templates, guides, and sample packs."""
+"""Seed owner user, tools, templates, guides, sample packs, and model registry."""
 
+from decimal import Decimal
 from typing import Any, cast
 
 from sqlalchemy.orm import Session
@@ -12,6 +13,8 @@ from app.models.entities import (
     Guide,
     GuideSection,
     GuideSectionContent,
+    ModelPricing,
+    ModelRegistry,
     RiskLevel,
     SampleDataPack,
     Tool,
@@ -220,6 +223,67 @@ def seed_sample_packs(db: Session) -> None:
     )
 
 
+MODELS = [
+    {
+        "provider": "mock",
+        "model": "mock-model",
+        "context_limit": 8192,
+        "streaming": True,
+        "tool_calling": False,
+        "input_cost": Decimal("0"),
+        "output_cost": Decimal("0"),
+    },
+    {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "context_limit": 128000,
+        "streaming": True,
+        "tool_calling": True,
+        "input_cost": Decimal("0.00000015"),
+        "output_cost": Decimal("0.0000006"),
+    },
+]
+
+
+def seed_models(db: Session) -> None:
+    for entry in MODELS:
+        reg = (
+            db.query(ModelRegistry)
+            .filter(
+                ModelRegistry.provider == entry["provider"], ModelRegistry.model == entry["model"]
+            )
+            .first()
+        )
+        if not reg:
+            reg = ModelRegistry(
+                provider=entry["provider"],
+                model=entry["model"],
+                context_limit=entry["context_limit"],
+                streaming=entry["streaming"],
+                tool_calling=entry["tool_calling"],
+                active=True,
+            )
+            db.add(reg)
+            db.flush()
+        pricing = (
+            db.query(ModelPricing)
+            .filter(
+                ModelPricing.provider == entry["provider"],
+                ModelPricing.model == entry["model"],
+            )
+            .first()
+        )
+        if not pricing:
+            db.add(
+                ModelPricing(
+                    provider=entry["provider"],
+                    model=entry["model"],
+                    input_token_cost=entry["input_cost"],
+                    output_token_cost=entry["output_cost"],
+                )
+            )
+
+
 def run_seed() -> None:
     from app.core.db import SessionLocal
 
@@ -229,6 +293,7 @@ def run_seed() -> None:
         seed_templates(db)
         seed_guides(db)
         seed_sample_packs(db)
+        seed_models(db)
         db.commit()
     print("Seed completed.")
 

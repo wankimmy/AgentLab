@@ -5,13 +5,17 @@ from app.agent_versions.router import router as versions_router
 from app.agents.router import router as agents_router
 from app.authentication.router import CurrentUser
 from app.authentication.router import router as auth_router
+from app.conversations.router import router as conversations_router
 from app.core.db import get_db
 from app.guides.router import router as guides_router
+from app.messages.router import router as messages_router
 from app.models.entities import Agent, AgentVersion, OnboardingProgress, ReleaseStatus
+from app.models_api.router import router as models_router
 from app.onboarding.router import router as onboarding_router
 from app.sample_packs.router import router as sample_packs_router
 from app.schemas.common import DashboardResponse
 from app.templates.router import router as templates_router
+from app.traces.router import router as traces_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -21,6 +25,10 @@ api_router.include_router(templates_router)
 api_router.include_router(onboarding_router)
 api_router.include_router(guides_router)
 api_router.include_router(sample_packs_router)
+api_router.include_router(conversations_router)
+api_router.include_router(messages_router)
+api_router.include_router(traces_router)
+api_router.include_router(models_router)
 
 
 @api_router.get("/health")

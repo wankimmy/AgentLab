@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     session_cookie_name: str = "agentlab_session"
     session_max_age_seconds: int = 86400
 
+    ai_base_url: str = "https://api.openai.com"
+    ai_api_key: str = ""
+    ai_default_model: str = "gpt-4o-mini"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

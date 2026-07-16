@@ -97,15 +97,15 @@ npx playwright test tests/e2e/onboarding.spec.ts
 
 ### Deliverables
 
-- [ ] OpenAI-compatible provider adapter + MockProvider
-- [ ] Model capability registry + pricing table
-- [ ] Conversation CRUD + message persistence
-- [ ] SSE streaming endpoint for chat
-- [ ] Three-panel playground UI (config, chat, trace)
-- [ ] Temporary overrides with visual indicator
-- [ ] Trace recording (tokens, cost, latency, TTFT)
-- [ ] Human feedback (rating + notes)
-- [ ] Memory modes (none, conversation, summarised)
+- [x] OpenAI-compatible provider adapter + MockProvider
+- [x] Model capability registry + pricing table
+- [x] Conversation CRUD + message persistence
+- [x] SSE streaming endpoint for chat
+- [x] Three-panel playground UI (config, chat, trace)
+- [x] Temporary overrides with visual indicator
+- [x] Trace recording (tokens, cost, latency, TTFT)
+- [x] Human feedback (rating + notes)
+- [x] Memory modes (none, conversation, summarised)
 
 ### Acceptance criteria
 

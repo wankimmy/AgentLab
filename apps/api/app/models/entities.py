@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -273,3 +275,143 @@ class SampleDataPack(Base, TimestampMixin):
     is_synthetic: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     template_slug: Mapped[str | None] = mapped_column(String(100))
     manifest: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+
+class MessageRole(str, enum.Enum):
+    system = "system"
+    user = "user"
+    assistant = "assistant"
+    tool = "tool"
+
+
+class ModelRegistry(Base, TimestampMixin):
+    __tablename__ = "model_registry"
+    __table_args__ = (UniqueConstraint("provider", "model", name="uq_model_registry"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    context_limit: Mapped[int] = mapped_column(Integer, default=8192)
+    streaming: Mapped[bool] = mapped_column(Boolean, default=True)
+    tool_calling: Mapped[bool] = mapped_column(Boolean, default=False)
+    structured_output: Mapped[bool] = mapped_column(Boolean, default=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ModelPricing(Base):
+    __tablename__ = "model_pricing"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_token_cost: Mapped[Decimal] = mapped_column(Numeric(12, 8), default=Decimal("0"))
+    output_token_cost: Mapped[Decimal] = mapped_column(Numeric(12, 8), default=Decimal("0"))
+    effective_from: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Conversation(Base, TimestampMixin):
+    __tablename__ = "conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), default="New conversation")
+    memory_summary: Mapped[str | None] = mapped_column(Text)
+    memory_summary_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="conversation", order_by="Message.sequence"
+    )
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    __table_args__ = (UniqueConstraint("conversation_id", "sequence", name="uq_message_sequence"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversations.id"), nullable=False
+    )
+    role: Mapped[MessageRole] = mapped_column(Enum(MessageRole), nullable=False)
+    content: Mapped[str] = mapped_column(Text, default="")
+    tool_calls: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    tool_call_id: Mapped[str | None] = mapped_column(String(100))
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    trace: Mapped["ChatTrace | None"] = relationship(back_populates="message", uselist=False)
+    feedback: Mapped["MessageFeedback | None"] = relationship(
+        back_populates="message", uselist=False
+    )
+
+
+class ChatTrace(Base):
+    __tablename__ = "chat_traces"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("messages.id"), nullable=False, unique=True
+    )
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    runtime: Mapped[str] = mapped_column(String(50), default="native")
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    ttft_ms: Mapped[int | None] = mapped_column(Integer)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[Decimal] = mapped_column(Numeric(12, 8), default=Decimal("0"))
+    retrieved_chunks: Mapped[list] = mapped_column(JSONB, default=list)
+    tool_requests: Mapped[list] = mapped_column(JSONB, default=list)
+    tool_results: Mapped[list] = mapped_column(JSONB, default=list)
+    guardrail_results: Mapped[list] = mapped_column(JSONB, default=list)
+    overrides: Mapped[dict] = mapped_column(JSONB, default=dict)
+    errors: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    message: Mapped["Message"] = relationship(back_populates="trace")
+    events: Mapped[list["TraceEvent"]] = relationship(
+        back_populates="trace", order_by="TraceEvent.timestamp"
+    )
+
+
+class TraceEvent(Base):
+    __tablename__ = "trace_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    trace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chat_traces.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    trace: Mapped["ChatTrace"] = relationship(back_populates="events")
+
+
+class MessageFeedback(Base, TimestampMixin):
+    __tablename__ = "message_feedback"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("messages.id"), nullable=False, unique=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    message: Mapped["Message"] = relationship(back_populates="feedback")

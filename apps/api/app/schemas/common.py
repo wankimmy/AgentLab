@@ -205,3 +205,107 @@ class DashboardResponse(BaseModel):
     estimated_cost: float = 0.0
     knowledge_status: str = "not_started"
     background_jobs_pending: int = 0
+
+
+class ConversationCreate(BaseModel):
+    agent_id: uuid.UUID
+    agent_version_id: uuid.UUID
+    title: str = "New conversation"
+
+
+class MessageResponse(BaseModel):
+    id: uuid.UUID
+    role: str
+    content: str
+    sequence: int
+    created_at: str
+    trace_id: uuid.UUID | None = None
+    feedback_rating: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ConversationSummary(BaseModel):
+    id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_version_id: uuid.UUID
+    title: str
+    created_at: str
+    updated_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class ConversationDetail(ConversationSummary):
+    messages: list[MessageResponse] = Field(default_factory=list)
+    memory_summary: str | None = None
+
+
+class SendMessageRequest(BaseModel):
+    content: str = Field(min_length=1)
+    overrides: dict[str, Any] | None = None
+
+
+class MessageFeedbackCreate(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    notes: str | None = None
+
+
+class MessageFeedbackResponse(BaseModel):
+    message_id: uuid.UUID
+    rating: int
+    notes: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class TraceEventResponse(BaseModel):
+    event_type: str
+    payload: dict[str, Any]
+    timestamp: str
+
+
+class TraceDetail(BaseModel):
+    id: uuid.UUID
+    message_id: uuid.UUID
+    agent_version_id: uuid.UUID
+    provider: str
+    model: str
+    runtime: str
+    duration_ms: int
+    ttft_ms: int | None
+    input_tokens: int
+    output_tokens: int
+    estimated_cost: float
+    retrieved_chunks: list[Any] = Field(default_factory=list)
+    tool_requests: list[Any] = Field(default_factory=list)
+    tool_results: list[Any] = Field(default_factory=list)
+    overrides: dict[str, Any] = Field(default_factory=dict)
+    errors: dict[str, Any] | None = None
+    events: list[TraceEventResponse] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
+
+
+class TraceSummary(BaseModel):
+    id: uuid.UUID
+    message_id: uuid.UUID
+    provider: str
+    model: str
+    duration_ms: int
+    input_tokens: int
+    output_tokens: int
+    estimated_cost: float
+    created_at: str
+
+
+class ModelRegistryItem(BaseModel):
+    id: uuid.UUID
+    provider: str
+    model: str
+    context_limit: int
+    streaming: bool
+    tool_calling: bool
+    active: bool
+
+    model_config = {"from_attributes": True}
