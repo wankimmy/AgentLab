@@ -25,16 +25,31 @@ services:
       timeout: 5s
       retries: 5
 
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.20.1
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflowdata:/mlflow
+
   api:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.api
+      target: dev
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql://agentlab:agentlab@postgres:5432/agentlab
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: http://localhost:3000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     ports:
       - "8000:8000"
     volumes:
@@ -50,6 +65,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.web
+      target: dev
     env_file:
       - .env
     environment:
@@ -66,11 +82,13 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.api
+      target: dev
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql://agentlab:agentlab@postgres:5432/agentlab
       REDIS_URL: redis://redis:6379/0
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     command: celery -A app.workers.celery_app worker --loglevel=info
     volumes:
       - ./apps/api:/app
@@ -84,3 +102,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  mlflowdata:

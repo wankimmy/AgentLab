@@ -8,6 +8,8 @@ from app.core.db import Base, get_db
 from app.core.security import hash_password
 from app.main import app
 from app.models.entities import User, UserRole
+from app.judges.seed import seed_judge_rubrics
+from app.release.seed import seed_release_thresholds
 from app.seed import (
     seed_guides,
     seed_models,
@@ -70,6 +72,8 @@ def setup_database():
         seed_guides(db)
         seed_sample_packs(db)
         seed_models(db)
+        seed_judge_rubrics(db)
+        seed_release_thresholds(db)
         db.commit()
     yield
     Base.metadata.drop_all(bind=engine)

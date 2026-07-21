@@ -25,6 +25,7 @@ interface DatasetDetail {
   id: string
   name: string
   description: string
+  agent_id: string | null
   versions: { id: string; version_number: number; case_count: number }[]
 }
 
@@ -32,6 +33,9 @@ const dataset = ref<DatasetDetail | null>(null)
 const version = ref<VersionDetail | null>(null)
 const loading = ref(true)
 const importing = ref(false)
+const generating = ref(false)
+const genEstimate = ref<{ estimated_cost: number; draft_count: number } | null>(null)
+const agentVersionId = ref('')
 const newCase = ref({ name: '', user_message: '', category: '', expected_answer: '' })
 
 onMounted(load)
@@ -45,6 +49,10 @@ async function load() {
       version.value = await api<VersionDetail>(
         `/evaluations/datasets/${datasetId}/versions/${latest.id}`,
       )
+    }
+    if (dataset.value.agent_id) {
+      const agent = await api<{ active_version?: { id: string } }>(`/agents/${dataset.value.agent_id}`)
+      agentVersionId.value = agent.active_version?.id || ''
     }
   } finally {
     loading.value = false
@@ -89,6 +97,29 @@ async function onImport(event: Event) {
 function exportUrl(format: 'json' | 'csv') {
   return `/api/v1/evaluations/datasets/${datasetId}/export?format=${format}`
 }
+
+async function estimateGenerate() {
+  if (!agentVersionId.value) return
+  genEstimate.value = await api(`/evaluations/datasets/${datasetId}/generate/estimate`, {
+    method: 'POST',
+    body: JSON.stringify({ agent_version_id: agentVersionId.value }),
+  })
+}
+
+async function generateDrafts() {
+  if (!agentVersionId.value) return
+  if (!confirm('Generate draft test cases? Review and approve before release runs.')) return
+  generating.value = true
+  try {
+    await api(`/evaluations/datasets/${datasetId}/generate`, {
+      method: 'POST',
+      body: JSON.stringify({ agent_version_id: agentVersionId.value, confirm: true }),
+    })
+    await load()
+  } finally {
+    generating.value = false
+  }
+}
 </script>
 
 <template>
@@ -119,7 +150,26 @@ function exportUrl(format: 'json' | 'csv') {
         >
           Run evaluation
         </NuxtLink>
+        <button
+          type="button"
+          class="rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
+          :disabled="!agentVersionId"
+          @click="estimateGenerate"
+        >
+          Estimate drafts
+        </button>
+        <button
+          type="button"
+          class="rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
+          :disabled="generating || !agentVersionId"
+          @click="generateDrafts"
+        >
+          {{ generating ? 'Generating...' : 'Generate draft cases' }}
+        </button>
       </section>
+      <p v-if="genEstimate" class="text-sm text-[var(--muted)]">
+        ~{{ genEstimate.draft_count }} drafts · est. ${{ genEstimate.estimated_cost.toFixed(4) }}
+      </p>
 
       <section class="rounded-xl border border-[var(--border)] bg-white p-6">
         <h2 class="font-medium">Add case (v{{ version?.version_number }})</h2>

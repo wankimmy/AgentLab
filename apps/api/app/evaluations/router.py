@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.authentication.router import CurrentUser
 from app.core.db import get_db
+from app.evaluations.judge_policy import resolve_judge_enabled
 from app.evaluations.import_export import (
     export_cases_csv,
     export_cases_json,
@@ -23,6 +24,8 @@ from app.evaluations.schemas import (
     DatasetDetail,
     DatasetSummary,
     EvalTemplateResponse,
+    HumanReviewCreate,
+    HumanReviewResponse,
     MetricResultResponse,
     ResultResponse,
     RunCreate,
@@ -33,24 +36,60 @@ from app.evaluations.schemas import (
     VersionCreate,
     VersionDetail,
     VersionSummary,
+    GenerateCasesEstimateRequest,
+    GenerateCasesEstimateResponse,
+    GenerateCasesRequest,
+    GenerateCasesResponse,
 )
+from app.evaluations.case_generation import estimate_generate_cost
 from app.models.entities import (
     Agent,
     AgentTemplate,
     AgentTemplateVersion,
     AgentVersion,
+    BackgroundJob,
     CaseStatus,
     EvaluationCase,
     EvaluationDataset,
     EvaluationDatasetVersion,
     EvaluationResult,
     EvaluationRun,
+    HumanReview,
+    HumanReviewVerdict,
+    JobStatus,
+    JudgeResult,
     MetricResult,
     RunStatus,
 )
-from app.workers.celery_app import run_evaluation_task
+from app.workers.celery_app import generate_eval_cases_task, run_evaluation_task
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"])
+
+
+def _verdict_to_api(verdict: HumanReviewVerdict) -> str:
+    if verdict == HumanReviewVerdict.pass_:
+        return "pass"
+    return verdict.value
+
+
+def _verdict_from_api(value: str) -> HumanReviewVerdict:
+    if value == "pass":
+        return HumanReviewVerdict.pass_
+    try:
+        return HumanReviewVerdict(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid verdict") from exc
+
+
+def _human_review_response(review: HumanReview) -> HumanReviewResponse:
+    return HumanReviewResponse(
+        verdict=_verdict_to_api(review.verdict),
+        rating=review.rating,
+        notes=review.notes,
+        issue_category=review.issue_category,
+        suggested_improvement=review.suggested_improvement,
+        preferred_answer=review.preferred_answer,
+    )
 
 
 def _get_user_dataset(dataset_id: uuid.UUID, user: CurrentUser, db: Session) -> EvaluationDataset:
@@ -264,6 +303,81 @@ def get_dataset(
             )
         )
     return DatasetDetail(**summary.model_dump(), versions=version_rows)
+
+
+@router.post(
+    "/datasets/{dataset_id}/generate/estimate",
+    response_model=GenerateCasesEstimateResponse,
+)
+def estimate_generate_cases(
+    dataset_id: uuid.UUID,
+    body: GenerateCasesEstimateRequest,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> GenerateCasesEstimateResponse:
+    _get_user_dataset(dataset_id, user, db)
+    version = db.get(AgentVersion, body.agent_version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Agent version not found")
+    agent = db.get(Agent, version.agent_id)
+    if not agent or agent.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Agent version not found")
+    specs_count = 6
+    return GenerateCasesEstimateResponse(
+        estimated_cost=estimate_generate_cost(db, version, specs_count),
+        draft_count=specs_count,
+    )
+
+
+@router.post(
+    "/datasets/{dataset_id}/generate",
+    response_model=GenerateCasesResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def generate_draft_cases(
+    dataset_id: uuid.UUID,
+    body: GenerateCasesRequest,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> GenerateCasesResponse:
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="Set confirm=true after reviewing estimate")
+    _get_user_dataset(dataset_id, user, db)
+    version = db.get(AgentVersion, body.agent_version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Agent version not found")
+    agent = db.get(Agent, version.agent_id)
+    if not agent or agent.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Agent version not found")
+
+    if body.dataset_version_id:
+        dv = db.get(EvaluationDatasetVersion, body.dataset_version_id)
+        if not dv or dv.dataset_id != dataset_id:
+            raise HTTPException(status_code=404, detail="Dataset version not found")
+    else:
+        dv = _latest_version(db, dataset_id)
+    if not dv:
+        raise HTTPException(status_code=400, detail="Dataset has no version")
+
+    job = BackgroundJob(
+        job_type="generate_eval_cases",
+        status=JobStatus.pending,
+        payload={
+            "dataset_version_id": str(dv.id),
+            "agent_version_id": str(version.id),
+        },
+    )
+    db.add(job)
+    db.commit()
+    generate_eval_cases_task.delay(str(job.id))
+    db.refresh(job)
+    created_raw = (job.payload or {}).get("created_case_ids", [])
+    created_ids = [uuid.UUID(str(x)) for x in created_raw]
+    return GenerateCasesResponse(
+        job_id=job.id,
+        created_case_ids=created_ids,
+        message="Draft cases created; approve before using in release runs.",
+    )
 
 
 @router.post(
@@ -533,6 +647,7 @@ def estimate_run(
         mode=body.mode.value,
         preset_id=body.preset_id,
         include_semantic=body.include_semantic,
+        judge_enabled=resolve_judge_enabled(body.mode, body.judge_enabled),
     )
     return RunEstimateResponse(
         estimated_cost=cost,
@@ -564,14 +679,20 @@ def start_run(body: RunCreate, user: CurrentUser, db: Session = Depends(get_db))
     if not dv:
         raise HTTPException(status_code=404, detail="Dataset version not found")
 
+    judge_on = resolve_judge_enabled(body.mode, body.judge_enabled)
+
     run = EvaluationRun(
         agent_version_id=body.agent_version_id,
         dataset_version_id=body.dataset_version_id,
         mode=body.mode,
-        judge_enabled=False,
+        judge_enabled=judge_on,
+        judge_model=body.judge_model,
         config_snapshot={
             "preset_id": body.preset_id,
             "include_semantic": body.include_semantic,
+            "judge_rubric_template_id": str(body.judge_rubric_template_id)
+            if body.judge_rubric_template_id
+            else None,
             "progress": {"completed_cases": 0, "total_cases": 0},
         },
     )
@@ -587,6 +708,7 @@ def start_run(body: RunCreate, user: CurrentUser, db: Session = Depends(get_db))
         dataset_version_id=run.dataset_version_id,
         mode=run.mode,
         status=run.status,
+        judge_enabled=run.judge_enabled,
         pass_rate=float(run.pass_rate) if run.pass_rate is not None else None,
         total_cost=float(run.total_cost) if run.total_cost is not None else None,
         progress=run.config_snapshot.get("progress", {}),
@@ -613,6 +735,7 @@ def list_runs(user: CurrentUser, db: Session = Depends(get_db)) -> list[RunSumma
             dataset_version_id=r.dataset_version_id,
             mode=r.mode,
             status=r.status,
+            judge_enabled=r.judge_enabled,
             pass_rate=float(r.pass_rate) if r.pass_rate is not None else None,
             total_cost=float(r.total_cost) if r.total_cost is not None else None,
             progress=(r.config_snapshot or {}).get("progress", {}),
@@ -636,6 +759,15 @@ def get_run(run_id: uuid.UUID, user: CurrentUser, db: Session = Depends(get_db))
     result_rows: list[ResultResponse] = []
     for result, case in results:
         metrics = db.query(MetricResult).filter(MetricResult.result_id == result.id).all()
+        human = (
+            db.query(HumanReview).filter(HumanReview.evaluation_result_id == result.id).first()
+        )
+        judge_row = (
+            db.query(JudgeResult)
+            .filter(JudgeResult.evaluation_result_id == result.id)
+            .order_by(JudgeResult.created_at.desc())
+            .first()
+        )
         result_rows.append(
             ResultResponse(
                 id=result.id,
@@ -659,6 +791,10 @@ def get_run(run_id: uuid.UUID, user: CurrentUser, db: Session = Depends(get_db))
                     )
                     for m in metrics
                 ],
+                human_review=_human_review_response(human) if human else None,
+                judge_overall_score=float(judge_row.overall_score)
+                if judge_row and judge_row.overall_score is not None
+                else None,
             )
         )
     return RunDetail(
@@ -667,6 +803,7 @@ def get_run(run_id: uuid.UUID, user: CurrentUser, db: Session = Depends(get_db))
         dataset_version_id=run.dataset_version_id,
         mode=run.mode,
         status=run.status,
+        judge_enabled=run.judge_enabled,
         pass_rate=float(run.pass_rate) if run.pass_rate is not None else None,
         total_cost=float(run.total_cost) if run.total_cost is not None else None,
         progress=(run.config_snapshot or {}).get("progress", {}),
@@ -692,9 +829,57 @@ def cancel_run(run_id: uuid.UUID, user: CurrentUser, db: Session = Depends(get_d
         dataset_version_id=run.dataset_version_id,
         mode=run.mode,
         status=run.status,
+        judge_enabled=run.judge_enabled,
         pass_rate=float(run.pass_rate) if run.pass_rate is not None else None,
         total_cost=float(run.total_cost) if run.total_cost is not None else None,
         progress=(run.config_snapshot or {}).get("progress", {}),
         started_at=run.started_at,
         completed_at=run.completed_at,
     )
+
+
+@router.post("/results/{result_id}/review", response_model=HumanReviewResponse)
+def submit_result_review(
+    result_id: uuid.UUID,
+    body: HumanReviewCreate,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> HumanReviewResponse:
+    result = (
+        db.query(EvaluationResult)
+        .join(EvaluationRun, EvaluationRun.id == EvaluationResult.run_id)
+        .join(AgentVersion, AgentVersion.id == EvaluationRun.agent_version_id)
+        .join(Agent, Agent.id == AgentVersion.agent_id)
+        .filter(EvaluationResult.id == result_id, Agent.user_id == user.id)
+        .first()
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Result not found")
+
+    verdict = _verdict_from_api(body.verdict)
+    existing = (
+        db.query(HumanReview).filter(HumanReview.evaluation_result_id == result_id).first()
+    )
+    if existing:
+        existing.verdict = verdict
+        existing.rating = body.rating
+        existing.notes = body.notes
+        existing.issue_category = body.issue_category
+        existing.suggested_improvement = body.suggested_improvement
+        existing.preferred_answer = body.preferred_answer
+        review = existing
+    else:
+        review = HumanReview(
+            evaluation_result_id=result_id,
+            reviewer_user_id=user.id,
+            verdict=verdict,
+            rating=body.rating,
+            notes=body.notes,
+            issue_category=body.issue_category,
+            suggested_improvement=body.suggested_improvement,
+            preferred_answer=body.preferred_answer,
+        )
+        db.add(review)
+    db.commit()
+    db.refresh(review)
+    return _human_review_response(review)

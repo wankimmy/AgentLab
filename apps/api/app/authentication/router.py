@@ -77,7 +77,7 @@ def login(
         )
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
-    token = create_session_token(str(user.id))
+    token = create_session_token(str(user.id), role=user.role.value)
     secure = settings.app_env == "production"
     response.set_cookie(
         key=settings.session_cookie_name,

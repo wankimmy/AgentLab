@@ -50,6 +50,12 @@ function statusLabel(status: string) {
           Datasets
         </NuxtLink>
         <NuxtLink
+          to="/reviews/blind-ab"
+          class="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium"
+        >
+          Blind A/B
+        </NuxtLink>
+        <NuxtLink
           to="/evaluations/runs/new"
           class="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white"
         >

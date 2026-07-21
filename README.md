@@ -2,7 +2,7 @@
 
 AgentLab is an AI agent playground and evaluation platform for developers and product teams.
 
-**Status:** Phase 6 complete — evaluation datasets, metrics engine, background eval runs.
+**Status:** Phase 11 complete — production readiness, portfolio docs. MVP delivered (Phases 1–11).
 
 ## Quick start
 
@@ -58,6 +58,12 @@ cd apps/web && npm run test && npm run build
 | [Phase 4 Notes](docs/learning-notes/phase-04.md) | Knowledge, RAG, retrieval debugger |
 | [Phase 5 Notes](docs/learning-notes/phase-05.md) | Tools, approval, native runtime |
 | [Phase 6 Notes](docs/learning-notes/phase-06.md) | Evaluation datasets, metrics, background runs |
+| [Phase 7 Notes](docs/learning-notes/phase-07.md) | LLM judge, human review, multi-judge |
+| [Phase 8 Notes](docs/learning-notes/phase-08.md) | Comparison, regression, MLflow, release check |
+| [Phase 9 Notes](docs/learning-notes/phase-09.md) | Improvement tools, red-team, exports, sample pack |
+| [Phase 10 Notes](docs/learning-notes/phase-10.md) | LangGraph runtime adapter, OpenTelemetry |
+| [Phase 11 Notes](docs/learning-notes/phase-11.md) | Production deploy, metrics, demo account, portfolio docs |
+| [Definition of Done](docs/definition-of-done.md) | MVP completion checklist |
 
 ## Stack
 

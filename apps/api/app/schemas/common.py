@@ -87,6 +87,7 @@ class VersionCreate(BaseModel):
     system_prompt: str | None = None
     provider: str | None = None
     model: str | None = None
+    runtime_type: RuntimeType | None = None
     change_summary: str | None = None
     user_notes: str | None = None
     copy_from_active: bool = True
@@ -188,6 +189,10 @@ class SamplePackSummary(BaseModel):
 class SamplePackInstallResponse(BaseModel):
     agent_id: uuid.UUID
     message: str
+    collection_id: uuid.UUID | None = None
+    dataset_id: uuid.UUID | None = None
+    eval_case_count: int | None = None
+    knowledge_doc_count: int | None = None
 
 
 class DashboardResponse(BaseModel):

@@ -22,7 +22,7 @@ from app.models.entities import (
 )
 from app.providers.base import ChatRequest
 from app.providers.registry import get_provider
-from app.services.chat_runtime import StreamResult, TurnOverrides, assemble_messages
+from app.services.turn_models import StreamResult, TurnOverrides, assemble_messages
 from app.services.cost_service import estimate_cost
 from app.services.retrieval_service import RetrievalService, build_rag_context_block
 from app.tools.executor import ToolContext, ToolExecutionError, execute_tool, tool_result_content
@@ -92,11 +92,18 @@ async def stream_native_turn(
             .count()
         )
         if linked > 0:
-            chunks = RetrievalService(db).retrieve(
-                user_content,
-                version_id=version.id,
-                config=version.retrieval_config,
-            )
+            from app.observability.otel import span_retrieval_search
+
+            with span_retrieval_search(
+                version_id=str(version.id),
+                top_k=int((version.retrieval_config or {}).get("top_k", 5)),
+                mode=str((version.retrieval_config or {}).get("mode", "hybrid")),
+            ):
+                chunks = RetrievalService(db).retrieve(
+                    user_content,
+                    version_id=version.id,
+                    config=version.retrieval_config,
+                )
             retrieved_citations = [c.to_citation() for c in chunks]
             rag_block = build_rag_context_block(chunks)
             if rag_block:
@@ -320,7 +327,10 @@ async def stream_native_turn(
                         return
 
                 try:
-                    output = execute_tool(ctx, tool_name, arguments)
+                    from app.observability.otel import span_tool_execute
+
+                    with span_tool_execute(tool_name=tool_name):
+                        output = execute_tool(ctx, tool_name, arguments)
                     result_text = tool_result_content(output)
                     tool_results.append({"tool": tool_name, "status": "success", "output": output})
                     yield StreamResult(

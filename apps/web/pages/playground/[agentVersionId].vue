@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePlaygroundStore } from '~/stores/playground'
-import type { ChatMessage } from '~/components/ChatPanel.vue'
+import type { ChatMessage, JudgeResultView } from '~/components/ChatPanel.vue'
 import type { TraceData } from '~/components/TracePanel.vue'
 
 definePageMeta({ middleware: ['auth', 'onboarding'] })
@@ -28,6 +28,8 @@ const pendingApproval = ref<{
 } | null>(null)
 const approvalBusy = ref(false)
 const toolActivity = ref<string[]>([])
+const judgeResults = ref<Record<string, JudgeResultView>>({})
+const judgingId = ref<string | null>(null)
 
 interface AgentVersion {
   id: string
@@ -169,6 +171,19 @@ async function submitFeedback(messageId: string, rating: number, notes: string) 
   if (msg) msg.feedback_rating = rating
 }
 
+async function runJudge(messageId: string) {
+  judgingId.value = messageId
+  try {
+    const result = await api<JudgeResultView>(`/messages/${messageId}/judge`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+    judgeResults.value = { ...judgeResults.value, [messageId]: result }
+  } finally {
+    judgingId.value = null
+  }
+}
+
 async function saveAsVersion() {
   saving.value = true
   try {
@@ -264,8 +279,11 @@ async function saveAsVersion() {
           :messages="messages"
           :streaming="streaming"
           :streaming-content="streamingContent"
+          :judge-results="judgeResults"
+          :judging-id="judgingId"
           @send="sendMessage"
           @feedback="submitFeedback"
+          @judge="runJudge"
         />
       </section>
       <aside class="lg:col-span-4" :class="mobileTab === 'trace' ? 'block' : 'hidden lg:block'">

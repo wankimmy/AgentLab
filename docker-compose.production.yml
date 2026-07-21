@@ -1,0 +1,80 @@
+# Production overrides — use with: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+
+services:
+  postgres:
+    ports: []
+    restart: unless-stopped
+
+  redis:
+    ports: []
+    restart: unless-stopped
+
+  mlflow:
+    ports: []
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_certs:/letsencrypt
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+
+  api:
+    image: ${API_IMAGE:-}
+    build:
+      target: prod
+    ports: []
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      CORS_ORIGINS: https://${DOMAIN}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.agentlab-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.agentlab-api.entrypoints=websecure
+      - traefik.http.routers.agentlab-api.tls.certresolver=letsencrypt
+      - traefik.http.services.agentlab-api.loadbalancer.server.port=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    image: ${WEB_IMAGE:-}
+    build:
+      target: prod
+    ports: []
+    restart: unless-stopped
+    environment:
+      NUXT_PUBLIC_API_BASE: https://${DOMAIN}/api
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.agentlab-web.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.agentlab-web.entrypoints=websecure
+      - traefik.http.routers.agentlab-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.agentlab-web.priority=1
+      - traefik.http.services.agentlab-web.loadbalancer.server.port=3000
+
+  worker:
+    image: ${API_IMAGE:-}
+    build:
+      target: prod
+    restart: unless-stopped
+
+volumes:
+  traefik_certs:

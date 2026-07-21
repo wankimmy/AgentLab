@@ -7,15 +7,26 @@ export interface ChatMessage {
   feedback_rating?: number | null
 }
 
+export interface JudgeResultView {
+  overall_score: number
+  passed: boolean
+  criteria_scores: Record<string, { score: number; explanation?: string }>
+  explanation: string
+  limitations_notice: string
+}
+
 const props = defineProps<{
   messages: ChatMessage[]
   streaming: boolean
   streamingContent: string
+  judgeResults?: Record<string, JudgeResultView>
+  judgingId?: string | null
 }>()
 
 const emit = defineEmits<{
   send: [content: string]
   feedback: [messageId: string, rating: number, notes: string]
+  judge: [messageId: string]
 }>()
 
 const input = ref('')
@@ -34,6 +45,9 @@ function rate(messageId: string, rating: number) {
 
 <template>
   <div class="flex h-[min(70vh,640px)] flex-col rounded-xl border border-[var(--border)] bg-white">
+    <p class="border-b border-[var(--border)] px-4 py-2 text-xs text-[var(--muted)]">
+      LLM judge scores are probabilistic and do not replace deterministic tests or human review.
+    </p>
     <div class="flex-1 space-y-3 overflow-y-auto p-4">
       <div
         v-for="msg in messages"
@@ -43,7 +57,7 @@ function rate(messageId: string, rating: number) {
       >
         <p class="mb-1 text-xs font-medium uppercase text-[var(--muted)]">{{ msg.role }}</p>
         <p class="whitespace-pre-wrap">{{ msg.content }}</p>
-        <div v-if="msg.role === 'assistant'" class="mt-2 flex items-center gap-2 text-xs">
+        <div v-if="msg.role === 'assistant'" class="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span class="text-[var(--muted)]">Rate:</span>
           <button
             v-for="n in 5"
@@ -55,6 +69,33 @@ function rate(messageId: string, rating: number) {
           >
             {{ n }}
           </button>
+          <button
+            type="button"
+            class="ml-2 rounded border border-[var(--border)] px-2 py-0.5 hover:bg-slate-100"
+            :disabled="judgingId === msg.id"
+            @click="emit('judge', msg.id)"
+          >
+            {{ judgingId === msg.id ? 'Judging...' : 'Run LLM Judge' }}
+          </button>
+        </div>
+        <div
+          v-if="judgeResults?.[msg.id]"
+          class="mt-2 rounded border border-[var(--border)] bg-white p-2 text-xs"
+        >
+          <template v-if="judgeResults[msg.id]">
+            <p>
+              Judge: {{ judgeResults[msg.id]!.overall_score.toFixed(2) }}
+              ({{ judgeResults[msg.id]!.passed ? 'pass' : 'fail' }})
+            </p>
+            <ul class="mt-1 space-y-0.5 text-[var(--muted)]">
+              <li v-for="(c, name) in judgeResults[msg.id]!.criteria_scores" :key="name">
+                {{ name }}: {{ c.score }}
+              </li>
+            </ul>
+            <p class="mt-1 text-[10px] text-[var(--muted)]">
+              {{ judgeResults[msg.id]!.limitations_notice }}
+            </p>
+          </template>
         </div>
       </div>
       <div v-if="streaming" class="mr-8 rounded-lg bg-teal-50 px-3 py-2 text-sm">

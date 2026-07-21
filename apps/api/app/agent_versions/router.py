@@ -64,7 +64,11 @@ def create_version(
         "system_prompt": body.system_prompt or (parent.system_prompt if parent else ""),
         "provider": body.provider or (parent.provider if parent else "mock"),
         "model": body.model or (parent.model if parent else "mock-model"),
-        "runtime_type": parent.runtime_type if parent else RuntimeType.native,
+        "runtime_type": (
+            body.runtime_type
+            if body.runtime_type is not None
+            else (parent.runtime_type if parent else RuntimeType.native)
+        ),
         "model_config_json": deepcopy(parent.model_config_json) if parent else {"temperature": 0.3},
         "retrieval_config": deepcopy(parent.retrieval_config) if parent else {},
         "tool_config": deepcopy(parent.tool_config) if parent else {},

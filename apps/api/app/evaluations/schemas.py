@@ -108,6 +108,9 @@ class RunEstimateRequest(BaseModel):
     mode: EvalMode = EvalMode.quick
     preset_id: str = "customer_support_quality"
     include_semantic: bool = True
+    judge_enabled: bool | None = None
+    judge_model: str | None = None
+    judge_rubric_template_id: uuid.UUID | None = None
 
 
 class RunEstimateResponse(BaseModel):
@@ -130,6 +133,24 @@ class MetricResultResponse(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class HumanReviewResponse(BaseModel):
+    verdict: str
+    rating: int | None
+    notes: str | None
+    issue_category: str | None
+    suggested_improvement: str | None
+    preferred_answer: str | None
+
+
+class HumanReviewCreate(BaseModel):
+    verdict: str
+    rating: int | None = Field(default=None, ge=1, le=5)
+    notes: str | None = None
+    issue_category: str | None = None
+    suggested_improvement: str | None = None
+    preferred_answer: str | None = None
+
+
 class ResultResponse(BaseModel):
     id: uuid.UUID
     case_id: uuid.UUID
@@ -142,6 +163,8 @@ class ResultResponse(BaseModel):
     tokens: int
     cost: float
     metrics: list[MetricResultResponse] = Field(default_factory=list)
+    human_review: HumanReviewResponse | None = None
+    judge_overall_score: float | None = None
 
 
 class RunSummary(BaseModel):
@@ -150,6 +173,7 @@ class RunSummary(BaseModel):
     dataset_version_id: uuid.UUID
     mode: EvalMode
     status: RunStatus
+    judge_enabled: bool = False
     pass_rate: float | None
     total_cost: float | None
     progress: dict[str, int] = Field(default_factory=dict)
@@ -160,3 +184,23 @@ class RunSummary(BaseModel):
 class RunDetail(RunSummary):
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
     results: list[ResultResponse] = Field(default_factory=list)
+
+
+class GenerateCasesEstimateRequest(BaseModel):
+    agent_version_id: uuid.UUID
+    dataset_version_id: uuid.UUID | None = None
+
+
+class GenerateCasesEstimateResponse(BaseModel):
+    estimated_cost: float
+    draft_count: int
+
+
+class GenerateCasesRequest(GenerateCasesEstimateRequest):
+    confirm: bool = False
+
+
+class GenerateCasesResponse(BaseModel):
+    job_id: uuid.UUID
+    created_case_ids: list[uuid.UUID] = Field(default_factory=list)
+    message: str

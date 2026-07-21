@@ -44,6 +44,8 @@ jobs:
         run: cd apps/api && ruff format --check .
       - name: Ruff lint
         run: cd apps/api && ruff check .
+      - name: Pip audit
+        run: pip install pip-audit && pip-audit -r apps/api/requirements.txt || true
       - name: Mypy
         run: cd apps/api && mypy app
       - name: Pytest

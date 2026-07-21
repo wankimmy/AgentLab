@@ -44,6 +44,7 @@ const form = ref({
   mode: 'quick',
   preset_id: 'customer_support_quality',
   include_semantic: true,
+  judge_enabled: null as boolean | null,
 })
 
 onMounted(load)
@@ -99,9 +100,19 @@ async function runEstimate() {
   estimating.value = true
   estimate.value = null
   try {
+    const body: Record<string, unknown> = { ...form.value }
+    if (form.value.mode === 'standard' && form.value.judge_enabled === null) {
+      body.judge_enabled = true
+    }
+    if (form.value.mode === 'release') {
+      body.judge_enabled = true
+    }
+    if (form.value.mode === 'quick') {
+      body.judge_enabled = form.value.judge_enabled ?? false
+    }
     estimate.value = await api<Estimate>('/evaluations/runs/estimate', {
       method: 'POST',
-      body: JSON.stringify(form.value),
+      body: JSON.stringify(body),
     })
   } finally {
     estimating.value = false
@@ -111,9 +122,16 @@ async function runEstimate() {
 async function confirmRun() {
   starting.value = true
   try {
+    const body: Record<string, unknown> = { ...form.value }
+    if (form.value.mode === 'standard' && form.value.judge_enabled === null) {
+      body.judge_enabled = true
+    }
+    if (form.value.mode === 'release') {
+      body.judge_enabled = true
+    }
     const run = await api<{ id: string }>('/evaluations/runs', {
       method: 'POST',
-      body: JSON.stringify(form.value),
+      body: JSON.stringify(body),
     })
     await router.push(`/evaluations/runs/${run.id}`)
   } finally {
@@ -152,8 +170,26 @@ async function confirmRun() {
         <select v-model="form.mode" class="mt-1 w-full rounded-lg border px-3 py-2">
           <option value="quick">Quick Check</option>
           <option value="standard">Standard</option>
+          <option value="release">Release</option>
         </select>
       </label>
+
+      <label
+        v-if="form.mode === 'standard'"
+        class="flex items-center gap-2 text-sm"
+      >
+        <input
+          v-model="form.judge_enabled"
+          type="checkbox"
+          :checked="form.judge_enabled !== false"
+          @change="form.judge_enabled = ($event.target as HTMLInputElement).checked"
+        >
+        Enable LLM judge (default on for Standard)
+      </label>
+
+      <p v-if="form.mode === 'release'" class="text-sm text-[var(--muted)]">
+        Release mode requires LLM judge on every case.
+      </p>
 
       <label class="block text-sm">
         <span class="font-medium">Metric preset</span>

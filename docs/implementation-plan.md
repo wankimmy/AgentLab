@@ -242,16 +242,16 @@ npx playwright test tests/e2e/evaluation-run.spec.ts
 
 ### Deliverables
 
-- [ ] Judge provider adapter (separate model)
-- [ ] Rubric templates (6 criteria)
-- [ ] Structured judge output with schema validation
-- [ ] Manual playground judge action
-- [ ] Standard eval judge integration
-- [ ] Release eval judge (required)
-- [ ] Multi-judge review
-- [ ] Human review recording
-- [ ] Blind A/B comparison UI
-- [ ] Judge limitations notice in UI
+- [x] Judge provider adapter (separate model)
+- [x] Rubric templates (6 criteria)
+- [x] Structured judge output with schema validation
+- [x] Manual playground judge action
+- [x] Standard eval judge integration
+- [x] Release eval judge (required)
+- [x] Multi-judge review
+- [x] Human review recording
+- [x] Blind A/B comparison UI
+- [x] Judge limitations notice in UI
 
 ### Acceptance criteria
 
@@ -278,14 +278,14 @@ cd apps/api && pytest tests/unit/test_judge_schema.py tests/integration/test_jud
 
 ### Deliverables
 
-- [ ] Version/model/settings comparison runs
-- [ ] Regression detection engine + rules
-- [ ] Comparison UI (deltas, improved/regressed/unchanged)
-- [ ] Release threshold templates
-- [ ] MLflow logging (params, metrics, artifacts)
-- [ ] Release evaluation mode
-- [ ] Release check flow
-- [ ] Mark release ready (manual, after check pass)
+- [x] Version/model/settings comparison runs
+- [x] Regression detection engine + rules
+- [x] Comparison UI (deltas, improved/regressed/unchanged)
+- [x] Release threshold templates
+- [x] MLflow logging (params, metrics, artifacts)
+- [x] Release evaluation mode
+- [x] Release check flow
+- [x] Mark release ready (manual, after check pass)
 
 ### Acceptance criteria
 
@@ -313,14 +313,14 @@ npx playwright test tests/e2e/comparison.spec.ts tests/e2e/release-check.spec.ts
 
 ### Deliverables
 
-- [ ] AI test case generation (manual, draft cases)
-- [ ] Prompt analysis and improvement suggestions
-- [ ] Improvement workspace (failed cases → suggestions)
-- [ ] Comparison AI summary (manual)
-- [ ] Red-team testing (manual, categorized attacks)
-- [ ] Promptfoo export
-- [ ] Ragas adapter (selected metrics)
-- [ ] ERP Support sample pack (full install)
+- [x] AI test case generation (manual, draft cases)
+- [x] Prompt analysis and improvement suggestions
+- [x] Improvement workspace (failed cases → suggestions)
+- [x] Comparison AI summary (manual)
+- [x] Red-team testing (manual, categorized attacks)
+- [x] Promptfoo export
+- [x] Ragas adapter (selected metrics)
+- [x] ERP Support sample pack (full install)
 
 ### Acceptance criteria
 
@@ -347,11 +347,11 @@ cd apps/api && pytest tests/unit/test_ragas_adapter.py tests/integration/test_re
 
 ### Deliverables
 
-- [ ] Runtime adapter interface formalised
-- [ ] LangGraph runtime adapter (optional per agent version)
-- [ ] OpenTelemetry SDK integration
-- [ ] OTLP exporter configuration
-- [ ] Documented adapter points for Langfuse/Phoenix
+- [x] Runtime adapter interface formalised
+- [x] LangGraph runtime adapter (optional per agent version)
+- [x] OpenTelemetry SDK integration
+- [x] OTLP exporter configuration
+- [x] Documented adapter points for Langfuse/Phoenix
 
 ### Acceptance criteria
 
@@ -377,17 +377,17 @@ cd apps/api && pytest tests/integration/test_langgraph_adapter.py -v
 
 ### Deliverables
 
-- [ ] Prometheus metrics endpoint
-- [ ] Structured logging with correlation IDs
-- [ ] `docker-compose.production.yml`
-- [ ] Traefik HTTPS configuration
-- [ ] GitHub Actions deploy workflow
-- [ ] Backup and restore scripts (tested)
-- [ ] Rollback procedure (tested)
-- [ ] Demo read-only account
-- [ ] Portfolio documentation (case study, interview prep, runbook, troubleshooting)
-- [ ] Security review checklist completed
-- [ ] Performance smoke tests
+- [x] Prometheus metrics endpoint
+- [x] Structured logging with correlation IDs
+- [x] `docker-compose.production.yml`
+- [x] Traefik HTTPS configuration
+- [x] GitHub Actions deploy workflow
+- [x] Backup and restore scripts (tested)
+- [x] Rollback procedure (tested)
+- [x] Demo read-only account
+- [x] Portfolio documentation (case study, interview prep, runbook, troubleshooting)
+- [x] Security review checklist completed
+- [x] Performance smoke tests
 
 ### Acceptance criteria
 

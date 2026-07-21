@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from app.metrics.deterministic import run_deterministic_metrics
 from app.metrics.rag import run_rag_metrics
+from app.metrics.ragas_adapter import run_ragas_metrics
 from app.metrics.semantic import semantic_similarity_metric
 from app.metrics.tool_metrics import run_tool_metrics
 from app.metrics.types import CaseInput, MetricOutcome, TraceSnapshot
@@ -35,6 +36,8 @@ ALL_RAG = {
     "context_relevance",
     "answer_support",
     "correct_no_context_refusal",
+    "context_precision",
+    "context_recall",
 }
 
 ALL_SEMANTIC = {"semantic_similarity"}
@@ -89,6 +92,7 @@ def evaluate_case(
     det = run_deterministic_metrics(case, actual_answer, snap)
     tool = run_tool_metrics(case, snap)
     rag = run_rag_metrics(case, actual_answer, snap)
+    ragas = run_ragas_metrics(case, actual_answer, snap, metrics)
     sem = semantic_similarity_metric(
         case.expected_answer,
         actual_answer,
@@ -96,7 +100,7 @@ def evaluate_case(
     )
 
     pool: dict[str, MetricOutcome] = {}
-    for item in det + tool + rag:
+    for item in det + tool + rag + ragas:
         pool[item.metric_name] = item
     if sem:
         pool[sem.metric_name] = sem

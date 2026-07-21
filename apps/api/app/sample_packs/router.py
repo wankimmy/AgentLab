@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.authentication.router import CurrentUser
 from app.core.db import get_db
 from app.models.entities import SampleDataPack
+from app.sample_packs.erp_install import install_erp_pack
 from app.schemas.common import SamplePackInstallResponse, SamplePackSummary
 from app.services.template_service import create_agent_from_template, get_template_by_slug
 
@@ -39,6 +40,29 @@ def install_sample_pack(
         raise HTTPException(status_code=404, detail="Linked template not found")
 
     synthetic_label = pack.manifest.get("label", "SYNTHETIC DATA")
+
+    if pack.slug == "erp-support":
+        result = install_erp_pack(
+            db,
+            user,
+            template.id,
+            pack_name=pack.name,
+            pack_slug=pack.slug,
+            synthetic_label=synthetic_label,
+        )
+        db.commit()
+        return SamplePackInstallResponse(
+            agent_id=result["agent_id"],
+            message=(
+                f"Installed {pack.name}: agent, {result['knowledge_doc_count']} knowledge docs, "
+                f"{result['eval_case_count']} eval cases (synthetic)."
+            ),
+            collection_id=result["collection_id"],
+            dataset_id=result["dataset_id"],
+            eval_case_count=result["eval_case_count"],
+            knowledge_doc_count=result["knowledge_doc_count"],
+        )
+
     agent = create_agent_from_template(
         db,
         user,

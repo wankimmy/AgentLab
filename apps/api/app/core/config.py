@@ -27,6 +27,20 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
+
+    judge_base_url: str = "https://api.openai.com"
+    judge_api_key: str = ""
+    judge_model: str = "gpt-4o-mini"
+
+    mlflow_tracking_uri: str = ""
+
+    otel_enabled: bool = True
+    otel_service_name: str = "agentlab-api"
+    otel_exporter_otlp_endpoint: str = ""
+
+    demo_email: str = ""
+    demo_password: str = ""
+
     uploads_dir: str = "uploads"
     celery_broker_url: str = ""
     celery_result_backend: str = ""

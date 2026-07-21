@@ -16,8 +16,11 @@ def get_redis() -> redis.Redis:
     return _redis_client
 
 
-def create_session_token(user_id: str) -> str:
-    return _serializer.dumps({"user_id": user_id})
+def create_session_token(user_id: str, role: str | None = None) -> str:
+    payload: dict[str, str] = {"user_id": user_id}
+    if role:
+        payload["role"] = role
+    return _serializer.dumps(payload)
 
 
 def decode_session_token(token: str) -> dict[str, Any] | None:

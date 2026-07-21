@@ -100,7 +100,7 @@ EVAL_PRESETS: list[dict[str, Any]] = [
     {
         "id": "release_readiness",
         "name": "Release Readiness",
-        "description": "Broad metric sweep for release gating (no judge in Phase 6).",
+        "description": "Broad metric sweep for release gating with required LLM judge.",
         "metrics": [
             "response_exists",
             "required_keyword",

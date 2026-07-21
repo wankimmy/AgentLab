@@ -21,6 +21,8 @@ from app.models.entities import (
     User,
     UserRole,
 )
+from app.judges.seed import seed_judge_rubrics
+from app.release.seed import seed_release_thresholds
 from app.seed_data import GUIDES, template_version_data
 
 TOOLS = [
@@ -121,6 +123,25 @@ def seed_owner(db: Session) -> None:
             email=settings.owner_email,
             password_hash=hash_password(settings.owner_password),
             role=UserRole.owner,
+            is_active=True,
+        )
+    )
+
+
+def seed_demo_user(db: Session) -> None:
+    if not settings.demo_email or not settings.demo_password:
+        return
+    existing = db.query(User).filter(User.email == settings.demo_email).first()
+    if existing:
+        existing.role = UserRole.demo
+        existing.password_hash = hash_password(settings.demo_password)
+        existing.is_active = True
+        return
+    db.add(
+        User(
+            email=settings.demo_email,
+            password_hash=hash_password(settings.demo_password),
+            role=UserRole.demo,
             is_active=True,
         )
     )
@@ -291,11 +312,14 @@ def run_seed() -> None:
 
     with SessionLocal() as db:
         seed_owner(db)
+        seed_demo_user(db)
         seed_tools(db)
         seed_templates(db)
         seed_guides(db)
         seed_sample_packs(db)
         seed_models(db)
+        seed_judge_rubrics(db)
+        seed_release_thresholds(db)
         db.commit()
     print("Seed completed.")
 

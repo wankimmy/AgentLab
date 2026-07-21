@@ -139,7 +139,7 @@ flowchart LR
 | OTLP | Generic OpenTelemetry backend |
 | MLflow | Evaluation trace correlation |
 
-Future adapters (Phase 10): Langfuse, Arize Phoenix. Core code does not depend on any single vendor.
+Langfuse and Arize Phoenix: configure OTLP only — see [otel-backends.md](../integrations/otel-backends.md). Core code does not depend on any single vendor.
 
 ## 5. Application Traces (Product Feature)
 

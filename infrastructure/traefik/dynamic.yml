@@ -1,0 +1,27 @@
+api:
+  routers:
+    api:
+      rule: "Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      entryPoints:
+        - websecure
+      service: api
+      tls:
+        certResolver: letsencrypt
+    web:
+      rule: "Host(`${DOMAIN}`)"
+      entryPoints:
+        - websecure
+      service: web
+      tls:
+        certResolver: letsencrypt
+      priority: 1
+
+  services:
+    api:
+      loadBalancer:
+        servers:
+          - url: "http://api:8000"
+    web:
+      loadBalancer:
+        servers:
+          - url: "http://web:3000"

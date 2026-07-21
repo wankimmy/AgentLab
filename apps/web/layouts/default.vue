@@ -14,6 +14,8 @@
           <NuxtLink to="/knowledge" class="hover:text-[var(--text)]">Knowledge</NuxtLink>
           <NuxtLink to="/retrieval-debugger" class="hover:text-[var(--text)]">Retrieval</NuxtLink>
           <NuxtLink to="/evaluations" class="hover:text-[var(--text)]">Evaluations</NuxtLink>
+          <NuxtLink to="/comparisons" class="hover:text-[var(--text)]">Comparisons</NuxtLink>
+          <NuxtLink to="/red-team" class="hover:text-[var(--text)]">Red team</NuxtLink>
           <button
             v-if="user"
             class="rounded-md border border-[var(--border)] px-3 py-1.5 hover:bg-slate-50"

@@ -734,3 +734,300 @@ class MetricResult(Base):
     details: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     result: Mapped["EvaluationResult"] = relationship(back_populates="metrics")
+
+
+class JudgeSourceType(str, enum.Enum):
+    message = "message"
+    evaluation_result = "evaluation_result"
+    multi = "multi"
+
+
+class JudgeRunStatus(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class HumanReviewVerdict(str, enum.Enum):
+    pass_ = "pass"
+    fail = "fail"
+    needs_review = "needs_review"
+
+
+class JudgeRubricTemplate(Base, TimestampMixin):
+    __tablename__ = "judge_rubric_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    criteria: Mapped[dict] = mapped_column(JSONB, default=dict)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class JudgeRun(Base):
+    __tablename__ = "judge_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    rubric_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("judge_rubric_templates.id")
+    )
+    source_type: Mapped[JudgeSourceType] = mapped_column(Enum(JudgeSourceType), nullable=False)
+    source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), default="mock")
+    model: Mapped[str] = mapped_column(String(100), default="")
+    status: Mapped[JudgeRunStatus] = mapped_column(
+        Enum(JudgeRunStatus), default=JudgeRunStatus.pending
+    )
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal("0"))
+    config_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    results: Mapped[list["JudgeResult"]] = relationship(back_populates="judge_run")
+
+
+class JudgeResult(Base):
+    __tablename__ = "judge_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    judge_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("judge_runs.id"), nullable=False)
+    evaluation_result_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("evaluation_results.id")
+    )
+    criteria_scores: Mapped[dict] = mapped_column(JSONB, default=dict)
+    overall_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    explanation: Mapped[str | None] = mapped_column(Text)
+    evidence: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    structured_raw: Mapped[dict] = mapped_column(JSONB, default=dict)
+    judge_index: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    judge_run: Mapped["JudgeRun"] = relationship(back_populates="results")
+
+
+class HumanReview(Base):
+    __tablename__ = "human_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    evaluation_result_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evaluation_results.id"), unique=True, nullable=False
+    )
+    reviewer_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    verdict: Mapped[HumanReviewVerdict] = mapped_column(Enum(HumanReviewVerdict), nullable=False)
+    rating: Mapped[int | None] = mapped_column(Integer)
+    notes: Mapped[str | None] = mapped_column(Text)
+    issue_category: Mapped[str | None] = mapped_column(String(100))
+    suggested_improvement: Mapped[str | None] = mapped_column(Text)
+    preferred_answer: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class BlindAbReview(Base):
+    __tablename__ = "blind_ab_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    reviewer_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    left_message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id"), nullable=False)
+    right_message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id"), nullable=False)
+    left_label: Mapped[str] = mapped_column(String(255), nullable=False)
+    right_label: Mapped[str] = mapped_column(String(255), nullable=False)
+    preference: Mapped[str] = mapped_column(String(10), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ComparisonRunStatus(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class CaseClassification(str, enum.Enum):
+    improved = "improved"
+    regressed = "regressed"
+    unchanged = "unchanged"
+
+
+class ReleaseCheckStatus(str, enum.Enum):
+    passed = "passed"
+    failed = "failed"
+    blocked = "blocked"
+
+
+class ReleaseThresholdTemplate(Base, TimestampMixin):
+    __tablename__ = "release_threshold_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    rules: Mapped[dict] = mapped_column(JSONB, default=dict)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ComparisonRun(Base):
+    __tablename__ = "comparison_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    baseline_agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=False
+    )
+    candidate_agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=False
+    )
+    baseline_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("evaluation_runs.id"))
+    candidate_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("evaluation_runs.id"))
+    status: Mapped[ComparisonRunStatus] = mapped_column(
+        Enum(ComparisonRunStatus), default=ComparisonRunStatus.pending
+    )
+    baseline_pass_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    candidate_pass_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    pass_rate_delta: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+    config_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+    ai_summary: Mapped[str | None] = mapped_column(Text)
+    ai_summary_status: Mapped[str] = mapped_column(String(30), default="pending")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    regressions: Mapped[list["RegressionResult"]] = relationship(back_populates="comparison_run")
+
+
+class PromptRecommendationSource(str, enum.Enum):
+    analyse = "analyse"
+    failed_cases = "failed_cases"
+
+
+class PromptRecommendationStatus(str, enum.Enum):
+    draft = "draft"
+    accepted = "accepted"
+    dismissed = "dismissed"
+
+
+class PromptRecommendation(Base):
+    __tablename__ = "prompt_recommendations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=False
+    )
+    source: Mapped[PromptRecommendationSource] = mapped_column(
+        Enum(PromptRecommendationSource), nullable=False
+    )
+    suggestions: Mapped[list] = mapped_column(JSONB, default=list)
+    status: Mapped[PromptRecommendationStatus] = mapped_column(
+        Enum(PromptRecommendationStatus), default=PromptRecommendationStatus.draft
+    )
+    estimated_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RedTeamRunStatus(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class RedTeamRun(Base):
+    __tablename__ = "red_team_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=False
+    )
+    status: Mapped[RedTeamRunStatus] = mapped_column(
+        Enum(RedTeamRunStatus), default=RedTeamRunStatus.pending
+    )
+    categories: Mapped[list] = mapped_column(JSONB, default=list)
+    config_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    cases: Mapped[list["RedTeamCase"]] = relationship(back_populates="run")
+
+
+class RedTeamCase(Base):
+    __tablename__ = "red_team_cases"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    red_team_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("red_team_runs.id"), nullable=False
+    )
+    category: Mapped[str] = mapped_column(String(100), nullable=False)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+    response: Mapped[str] = mapped_column(Text, default="")
+    passed: Mapped[bool | None] = mapped_column(Boolean)
+    severity: Mapped[str] = mapped_column(String(20), default="medium")
+    promoted_case_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("evaluation_cases.id")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    run: Mapped["RedTeamRun"] = relationship(back_populates="cases")
+
+
+class RegressionResult(Base):
+    __tablename__ = "regression_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    comparison_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("comparison_runs.id"), nullable=False
+    )
+    case_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("evaluation_cases.id"))
+    case_name: Mapped[str] = mapped_column(String(255), default="")
+    classification: Mapped[CaseClassification] = mapped_column(Enum(CaseClassification), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), default="medium")
+    details: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    comparison_run: Mapped["ComparisonRun"] = relationship(back_populates="regressions")
+
+
+class ReleaseCheck(Base):
+    __tablename__ = "release_checks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=False
+    )
+    eval_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("evaluation_runs.id"))
+    threshold_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("release_threshold_templates.id")
+    )
+    status: Mapped[ReleaseCheckStatus] = mapped_column(Enum(ReleaseCheckStatus), nullable=False)
+    findings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

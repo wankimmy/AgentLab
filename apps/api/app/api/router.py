@@ -5,18 +5,33 @@ from app.agent_versions.router import router as versions_router
 from app.agents.router import router as agents_router
 from app.authentication.router import CurrentUser
 from app.authentication.router import router as auth_router
+from app.comparisons.router import router as comparisons_router
 from app.conversations.router import router as conversations_router
 from app.core.db import get_db
 from app.evaluations.router import router as evaluations_router
+from app.exports.router import router as exports_router
 from app.guides.router import router as guides_router
+from app.judges.router import router as judges_router
 from app.knowledge.retrieval_router import router as retrieval_router
 from app.knowledge.retrieval_router import version_router as version_collections_router
 from app.knowledge.router import router as knowledge_router
 from app.messages.router import router as messages_router
-from app.models.entities import Agent, AgentVersion, OnboardingProgress, ReleaseStatus
+from app.models.entities import (
+    Agent,
+    AgentVersion,
+    CaseClassification,
+    ComparisonRun,
+    OnboardingProgress,
+    RegressionResult,
+    ReleaseStatus,
+)
 from app.models_api.router import router as models_router
 from app.onboarding.router import router as onboarding_router
+from app.prompts.router import router as prompts_router
+from app.red_team.router import router as red_team_router
 from app.sample_packs.router import router as sample_packs_router
+from app.release.router import router as release_router
+from app.reviews.router import router as reviews_router
 from app.schemas.common import DashboardResponse
 from app.templates.router import router as templates_router
 from app.tool_approvals.router import router as tool_approvals_router
@@ -41,6 +56,13 @@ api_router.include_router(version_collections_router)
 api_router.include_router(tools_router)
 api_router.include_router(tool_approvals_router)
 api_router.include_router(evaluations_router)
+api_router.include_router(judges_router)
+api_router.include_router(comparisons_router)
+api_router.include_router(reviews_router)
+api_router.include_router(release_router)
+api_router.include_router(exports_router)
+api_router.include_router(prompts_router)
+api_router.include_router(red_team_router)
 
 
 @api_router.get("/health")
@@ -83,9 +105,19 @@ def dashboard(user: CurrentUser, db: Session = Depends(get_db)) -> DashboardResp
     )
     progress = db.get(OnboardingProgress, user.id)
     onboarding_complete = progress.completed if progress else False
+    recent_regressions = (
+        db.query(RegressionResult)
+        .join(ComparisonRun, ComparisonRun.id == RegressionResult.comparison_run_id)
+        .filter(
+            ComparisonRun.user_id == user.id,
+            RegressionResult.classification == CaseClassification.regressed,
+        )
+        .count()
+    )
     return DashboardResponse(
         total_agents=total_agents,
         active_versions=active_versions,
         draft_versions=draft_versions,
         onboarding_complete=onboarding_complete,
+        recent_regressions=recent_regressions,
     )

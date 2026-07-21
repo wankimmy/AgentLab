@@ -69,9 +69,10 @@ ERP_EVAL_STARTER = {
     ]
 }
 
+from app.judges.rubrics import STANDARD_SIX_CRITERIA
+
 ERP_JUDGE_RUBRIC = {
-    "correctness": {"scale": "1-5", "threshold": 4},
-    "groundedness": {"scale": "1-5", "threshold": 4},
+    **STANDARD_SIX_CRITERIA,
     "citation": {"scale": "1-5", "threshold": 4},
 }
 
